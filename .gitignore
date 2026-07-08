@@ -1,0 +1,102 @@
+# Python caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Editor / OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Local environment files
+.env
+.env.*
+!.env.example
+*.local
+
+# Build / package artifacts
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# LFV generated training and inference results
+data/outputs/
+data/env_data/
+outputs/
+runs/
+wandb/
+wandb_cache/
+checkpoints/
+logs/
+*.log
+
+# Hydra / experiment metadata
+.hydra/
+**/.hydra/
+multirun/
+
+# Model checkpoints and exported weights
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.tflite
+*.engine
+*.safetensors
+
+# Generated numeric results / intermediate arrays
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.joblib
+
+# Local processed datasets copied into the repo by mistake
+episode_*/
+**/episode_*/
+*.zarr/
+rgb/
+depth/
+camera_*.mp4
+timestamps.npy
+meta.json
+lang_emb.npy
+dino_failed_logs.txt
+
+# Inference visualizations and result tables
+*_overlay.png
+*_traj.png
+summary.csv
+*.csv
+
+# Third-party checkpoints / downloaded model assets
+third_party/
+third_party/**/checkpoints/
+third_party/**/checkpoint*/
+third_party/**/weights/
+third_party/**/pretrained/
+third_party/**/pretrained_models/
+third_party/**/models/checkpoints/
+third_party/**/*.ckpt
+third_party/**/*.pt
+third_party/**/*.pth
+third_party/**/*.onnx
+
+# Third-party demo media not needed for LFV source release
+third_party/tapip3d/co-tracker/assets/*.mp4
+third_party/tapip3d/co-tracker/gradio_demo/videos/
+
+# Large local data roots if created under the repo
+datasets/
+raw_data/
+processed_data/
+external_data/

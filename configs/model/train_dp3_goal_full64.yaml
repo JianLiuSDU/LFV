@@ -1,0 +1,211 @@
+defaults:
+  - _self_
+  - task: multitask_goal_full64
+
+name: train_dp3_goal_full64
+exp_name: "goal_conditioned_full64_boundary_inpainting"
+
+task_name: ${task.task_name}
+shape_meta: ${task.shape_meta}
+
+horizon: 64
+n_obs_steps: 1
+n_action_steps: 64
+n_latency_steps: 0
+dataset_obs_steps: ${n_obs_steps}
+keypoint_visible_rate: 1.0
+obs_as_global_cond: true
+
+pose_estimation:
+  mesh_dir: null
+
+policy:
+  _target_: diffusion_policy_3d.policy.simple_dp3.SimpleDP3
+
+  use_point_crop: false
+
+  # ===== Goal-conditioned full64 encoder =====
+  obs_encoder_type: goal_conditioned_set_transformer
+  use_cross_attention: false
+  use_goal_condition: true
+
+  goal_pose_key: goal_pose9d
+  goal_delta_pose_key: goal_delta_pose9d
+  goal_delta_pose7d_key: goal_delta_pose7d
+
+  # 先关闭 goal noise，保证基础训练稳定。
+  # 后续如果要提升对第一阶段预测误差的鲁棒性，可以改成 0.003 或 0.005。
+  goal_noise_std_xyz: 0.0
+  goal_noise_std_rot: 0.0
+
+  # ===== Boundary inpainting =====
+  use_boundary_inpainting: true
+  start_boundary_mode: identity
+  end_boundary_mode: goal_delta_pose7d
+
+  # ===== Condition / encoder =====
+  encoder_output_dim: 256
+  condition_type: film
+  use_lang_emb: true
+  use_stage_emb: false
+  use_progress: false
+  use_pc_color: false
+
+  use_down_condition: true
+  use_mid_condition: true
+  use_up_condition: true
+
+  diffusion_step_embed_dim: 256
+  down_dims:
+    - 128
+    - 256
+    - 384
+
+  crop_shape: null
+  horizon: ${horizon}
+  kernel_size: 5
+  n_action_steps: ${n_action_steps}
+  n_groups: 8
+  n_obs_steps: ${n_obs_steps}
+
+  noise_scheduler:
+    _target_: diffusers.schedulers.scheduling_ddim.DDIMScheduler
+    num_train_timesteps: 100
+    beta_start: 0.0001
+    beta_end: 0.02
+    beta_schedule: squaredcos_cap_v2
+    clip_sample: true
+    set_alpha_to_one: true
+    steps_offset: 0
+    prediction_type: sample
+
+  num_inference_steps: 10
+  obs_as_global_cond: true
+  shape_meta: ${shape_meta}
+
+  pointnet_type: "pointnet"
+  pointcloud_encoder_cfg: null
+
+  goal_encoder_cfg:
+    d_model: 128
+    num_heads: 4
+    num_layers: 3
+    ffn_dim: 512
+    dropout: 0.1
+    fourier_bands: 6
+    use_goal_abs_token: true
+    token_pooling:
+      type: pma
+      k_man: 16
+      k_target: 16
+      num_heads: 4
+      dropout: 0.1
+
+ema:
+  _target_: diffusion_policy_3d.model.diffusion.ema_model.EMAModel
+  update_after_step: 0
+  inv_gamma: 1.0
+  power: 0.75
+  min_value: 0.0
+  max_value: 0.9999
+
+dataloader:
+  batch_size: 64
+  num_workers: 8
+  shuffle: true
+  pin_memory: true
+  persistent_workers: false
+
+val_dataloader:
+  batch_size: 64
+  num_workers: 8
+  shuffle: false
+  pin_memory: true
+  persistent_workers: false
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 1.0e-4
+  betas: [0.95, 0.999]
+  eps: 1.0e-8
+  weight_decay: 1.0e-6
+
+training:
+  device: "cuda:0"
+  seed: 42
+  output_root: data/outputs/full64
+  debug: false
+  resume: false
+
+  lr_scheduler: cosine
+  lr_warmup_steps: 500
+
+  # 正式训练轮数，之后直接 python tools/train_dp3.py 即可使用这里的设置。
+  num_epochs: 1500
+
+  gradient_accumulate_every: 1
+  use_ema: true
+
+  rollout_every: 200
+
+  # 每 100 epoch 保存一次 epoch=0100.ckpt / epoch=0200.ckpt ...
+  checkpoint_every: 100
+
+  # 每 10 epoch 做一次验证。
+  val_every: 10
+
+  # 每 5 epoch 打印一次训练 batch 的 full64 middle trajectory 指标。
+  sample_every: 5
+
+  max_train_steps: null
+  max_val_steps: null
+  tqdm_interval_sec: 1.0
+
+logging:
+  group: ${exp_name}
+  id: null
+  mode: offline
+  name: ${task.task_name}_seed${training.seed}
+  project: dp3-goal-full64
+  resume: false
+  tags:
+    - dp3
+    - goal_conditioned
+    - full64
+    - boundary_inpainting
+
+checkpoint:
+  save_ckpt: true
+
+  # top-k 不再监控 test_mean_score。
+  # test_mean_score 当前只是 -train_loss，不适合作为模型选择依据。
+  # 这里改成验证集 middle trajectory 位置误差，越小越好。
+  topk:
+    monitor_key: val_sample_middle_traj_pos_err_cm_mean
+    mode: min
+    k: 3
+    format_str: 'epoch={epoch:04d}-val_mid_pos_cm={val_sample_middle_traj_pos_err_cm_mean:.3f}.ckpt'
+
+  save_last_ckpt: true
+  save_last_snapshot: false
+
+multi_run:
+  run_dir: ${training.output_root}/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+  wandb_name_base: ${now:%Y.%m.%d-%H.%M.%S}_${name}_${task_name}
+
+hydra:
+  job:
+    override_dirname: ${name}
+
+  # 这里只作为总根目录。
+  # train_dp3.py 内部还会自动拼:
+  # ${training.output_root}/<task.output_name>_seed<seed>/<timestamp>/
+  run:
+    dir: ${training.output_root}
+
+  sweep:
+    dir: ${training.output_root}/${now:%Y.%m.%d}/${now:%H.%M.%S}_${name}_${task_name}
+    subdir: ${hydra.job.num}
+
+evaluation:
+  eval_epoch: null
