@@ -1,0 +1,53 @@
+task_name: contact_field_manual
+
+paths:
+  processed_root: /media/ljian/lj/data_3d/pickNplace_lfv
+
+tapip3d:
+  intrinsics_source: depth_intrinsics_original
+
+contact:
+  output_dir: contact_field
+  object_mask_path: sam_mask/affordance_mask.npy
+
+  # MVP: manually specify anchor/contact timing and hand evidence.
+  # Override from CLI for a real episode:
+  #   --anchor-frame 0 --contact-window 40 48 --hand-bbox x0 y0 x1 y1
+  anchor_frame: 0
+  contact_window: [0, 0]
+  contact_frame_stride: 1
+  hand_bbox: null
+  hand_bboxes_by_frame: {}
+  hand_bboxes_by_episode: {}
+  hand_masks_dir: null
+  hand_mask_pattern: frame_{frame:06d}.npy
+
+  num_points: 4096
+  seed: 42
+  outlier_std_ratio: 2.5
+  normal_k: 16
+  distance_sigma_px: 8.0
+  depth_sigma_m: 0.025
+  use_depth_consistency: true
+  seed_threshold: 0.5
+  fallback_topk: 32
+  min_axis_px: 6.0
+  max_axis_px: 80.0
+  cov_regularizer: 9.0
+  heat_area_threshold: 0.2
+
+  surface_correction:
+    enabled: true
+    threshold: 0.4
+    knn: 12
+    max_neighbor_dist_m: 0.025
+    min_normal_dot: 0.2
+
+  quality:
+    min_valid_depth_ratio_good: 0.35
+    min_seed_count_good: 8
+    max_heat_area_ratio_good: 0.35
+
+runtime:
+  overwrite: false
+  episodes: null

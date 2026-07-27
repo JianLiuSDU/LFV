@@ -5,7 +5,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from lfv.data.episode_io import first_rgb_frame, iter_processed_episodes
+from lfv.data_processing.episode_io import first_rgb_frame, iter_processed_episodes
 from lfv.pipeline.object_specs import ObjectSpec, iter_object_specs
 
 

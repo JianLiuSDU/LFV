@@ -1,6 +1,0 @@
-raw_data_root: /media/ljian/lj/new_data
-processed_data_root: /media/ljian/lj/data_3d
-sam2_root: /home/users1/ljian/sam2
-object_centric_diffusion_root: /home/users1/ljian/object_centric_diffusion
-im2flow2act_root: /home/users1/ljian/im2Flow2Act
-

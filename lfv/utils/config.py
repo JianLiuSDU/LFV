@@ -15,6 +15,9 @@ class Config(dict):
         except KeyError as exc:
             raise AttributeError(name) from exc
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        self[name] = _wrap(value)
+
 
 def _wrap(value: Any) -> Any:
     if isinstance(value, dict):
@@ -38,4 +41,3 @@ def get_nested(cfg: Config, dotted_key: str, default: Any = None) -> Any:
             return default
         cur = cur[key]
     return cur
-

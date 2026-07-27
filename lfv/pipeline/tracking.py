@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import zarr
 
-from lfv.data.episode_io import iter_processed_episodes
+from lfv.data_processing.episode_io import iter_processed_episodes
 from lfv.utils.imagecodecs import register_image_codecs
 
 

@@ -1,0 +1,25 @@
+name: hand_pouring
+description: "Human RGB-D demonstrations of pouring from a cup into a bowl."
+
+objects:
+  manipulated:
+    role: source
+    name: cup
+    prompts:
+      - "cup ."
+  reference:
+    role: target
+    name: bowl
+    prompts:
+      - "bowl ."
+
+coordinate_frames:
+  camera: "OpenCV camera coordinates: x right, y down, z forward"
+  object: "Manipulated-object anchor frame, translated by object_center_camera"
+
+stages:
+  - contact_understanding
+  - grasp_generation
+  - functional_motion_generation
+  - robot_feasibility_selection
+

@@ -1,8 +1,8 @@
-task_name: pickNplace
+task_name: pouring#pickNplace
 
 paths:
-  raw_root: /media/ljian/lj/new_data/pickNplace
-  processed_root: /media/ljian/lj/data_3d/pickNplace_lfv
+  raw_root: /media/ljian/lj/new_data/pouring
+  processed_root: /media/ljian/lj/data_3d/pouring_lfv
 
 object:
   name: "target object ."
@@ -12,7 +12,7 @@ object:
 
 objects:
   affordance:
-    prompt: "yellow banana ."
+    prompt: "cup ."
     bbox_dir: bbox
     bbox_file: affordance_bbox.npy
     mask_dir: sam_mask
@@ -21,7 +21,7 @@ objects:
     sample_file: sampled_2d_uniform.npy
     viz_prefix: affordance
   target:
-    prompt: "plate ."
+    prompt: "bowl ."
     bbox_dir: target_bbox
     bbox_file: target_bbox.npy
     mask_dir: target_sam_mask

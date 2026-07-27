@@ -1,0 +1,38 @@
+experiment_name: functional_motion_base
+stage: functional_motion_generation
+
+data:
+  dataset_config: configs/data/datasets/hand_pouring_lfv.yaml
+  task_config: configs/data/tasks/hand_pouring.yaml
+  input_keys:
+    - manipulated_points_object
+    - manipulated_dinov2_features
+    - reference_points_object
+    - reference_dinov2_features
+    - object_object_geometry
+  target_keys:
+    - object_centric_se3_trajectory
+
+model:
+  package: lfv.models.functional_motion_generation
+  object_encoder: todo
+  relation_encoder: todo
+  trajectory_generator: conditional_diffusion_todo
+
+training:
+  trainer_package: lfv.training.functional_motion
+  batch_size: null
+  num_epochs: null
+  learning_rate: null
+
+inference:
+  package: lfv.inference.functional_motion
+  num_trajectory_samples: null
+
+evaluation:
+  package: lfv.evaluation.functional_motion
+  metrics:
+    - trajectory_reconstruction_error
+    - multimodal_coverage
+    - object_relation_consistency
+

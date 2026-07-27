@@ -21,6 +21,15 @@ STAGES = {
     "sample": "lfv.pipeline.sample_points",
     "track": "lfv.pipeline.tracking",
     "se3": "lfv.pipeline.se3_trajectory",
+    "hand": "lfv.pipeline.hand_segmentation",
+    "hand_bbox": "lfv.pipeline.hand_bbox",
+    "hand_mask": "lfv.pipeline.hand_mask",
+    "timing": "lfv.pipeline.contact_timing",
+    "dinov2": "lfv.pipeline.dinov2_features",
+    "contact_heatmap": "lfv.pipeline.contact_heatmap",
+    "contact": "lfv.pipeline.contact_field",
+    "hamer": "lfv.pipeline.hamer_hand_pose",
+    "thumb_index_grasp": "lfv.pipeline.thumb_index_grasp_label",
 }
 
 

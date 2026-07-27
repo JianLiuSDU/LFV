@@ -4,6 +4,7 @@ import os
 
 # 在导入 transformers 之前设置 HF 镜像
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+import inspect
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -11,7 +12,7 @@ import numpy as np
 import torch
 from PIL import Image
 
-from lfv.data.episode_io import first_rgb_frame, iter_processed_episodes
+from lfv.data_processing.episode_io import first_rgb_frame, iter_processed_episodes
 from lfv.pipeline.object_specs import ObjectSpec, iter_object_specs
 
 
@@ -47,13 +48,19 @@ def get_object_bbox(initial_frame, text: str, device: str, processor, model, box
     inputs = processor(images=image, text=text, return_tensors="pt").to(device)
     with torch.no_grad():
         outputs = model(**inputs)
-    results = processor.post_process_grounded_object_detection(
-        outputs,
-        inputs.input_ids,
-        box_threshold=box_threshold,
-        text_threshold=text_threshold,
-        target_sizes=[image.size[::-1]],
-    )
+    post_process = processor.post_process_grounded_object_detection
+    kwargs = {
+        "outputs": outputs,
+        "input_ids": inputs.input_ids,
+        "text_threshold": text_threshold,
+        "target_sizes": [image.size[::-1]],
+    }
+    signature = inspect.signature(post_process)
+    if "box_threshold" in signature.parameters:
+        kwargs["box_threshold"] = box_threshold
+    else:
+        kwargs["threshold"] = box_threshold
+    results = post_process(**kwargs)
     if len(results[0]["boxes"]) == 0:
         raise ValueError(f"No object detected for text prompt: {text!r}")
     return results[0]["boxes"].detach().cpu().numpy()[0]

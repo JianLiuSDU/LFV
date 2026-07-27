@@ -8,7 +8,7 @@ from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as R_scipy
 from scipy.spatial.transform import Slerp
 
-from lfv.data.episode_io import iter_processed_episodes
+from lfv.data_processing.episode_io import iter_processed_episodes
 
 
 def compute_weighted_rigid_transform_se3(P, Q, weights):

@@ -5,5 +5,4 @@ description = "LFV data processing and model pipeline"
 requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]
-include = ["lfv*"]
-
+include = ["lfv*", "lfv_sim*"]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from lfv.data.episode_io import prepare_processed_dataset
+from lfv.data_processing.episode_io import prepare_processed_dataset
 
 
 def run(cfg) -> None:

@@ -30,6 +30,8 @@ pip-wheel-metadata/
 
 # LFV generated training and inference results
 data/outputs/
+data/sim_debug/
+data/sim_debug*/
 data/env_data/
 outputs/
 runs/
