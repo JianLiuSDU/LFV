@@ -1,8 +1,12 @@
 [project]
 name = "lfv"
 version = "0.1.0"
-description = "LFV data processing and model pipeline"
+description = "LFV one-shot 2D affordance transfer and source-data processing"
 requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]
 include = ["lfv*", "lfv_sim*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"

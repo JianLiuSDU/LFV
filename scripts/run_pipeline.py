@@ -28,8 +28,6 @@ STAGES = {
     "dinov2": "lfv.pipeline.dinov2_features",
     "contact_heatmap": "lfv.pipeline.contact_heatmap",
     "contact": "lfv.pipeline.contact_field",
-    "hamer": "lfv.pipeline.hamer_hand_pose",
-    "thumb_index_grasp": "lfv.pipeline.thumb_index_grasp_label",
 }
 
 

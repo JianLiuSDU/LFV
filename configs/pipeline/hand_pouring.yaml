@@ -123,33 +123,6 @@ contact_heatmap:
     max_neighbor_dist_m: 0.025
     min_normal_dot: 0.2
 
-hamer:
-  timing_path: contact_timing/contact_timing.json
-  output_dir: hamer_grasp_pseudo_label
-  input_dirname: hamer_input
-  output_dirname: hamer_output
-  window_size: 4
-  batch_size: 8
-  staging_dirname: _hamer_batch_staging
-
-thumb_index_grasp:
-  timing_path: contact_timing/contact_timing.json
-  output_dir: hamer_grasp_pseudo_label
-  hamer_output_dir: hamer_grasp_pseudo_label/hamer_output
-  contact_heatmap_path: contact_heatmap/contact_heatmap.npz
-  hand_masks_dir: hand_mask
-  hand_mask_pattern: frame_{frame:06d}.npy
-  # Should match hamer.window_size.
-  window_size: 4
-  min_keypoint_conf: 0.2
-  depth_radius: 4
-  depth_fallback_radius: 14
-  width_margin: 0.012
-  tcp_to_contact_offset: 0.045
-  min_width: 0.015
-  max_width: 0.085
-  max_finger_surface_dist: 0.070
-
 tapip3d:
   checkpoint: /home/users1/ljian/TAPIP3D/checkpoints/tapip3d_final.pth
   intrinsics_source: depth_intrinsics_original

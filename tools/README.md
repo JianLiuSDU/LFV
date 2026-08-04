@@ -9,7 +9,8 @@ only a thin wrapper under `scripts/`.
 Current important tools:
 
 - `check_hand_pouring_contact_batch.py`
-- `check_hand_pouring_grasp_batch.py`
-- `verify_episode0_graspnet_contact_roi.py`
-- `visualize_hamer_thumb_index_grasp_open3d.py`
+- `check_contact_field_outputs.py`
+- `check_pipeline_outputs.py`
 
+Stable Soft Heatmap AffCorrs commands live under
+`scripts/affordance_transfer/`, not in this one-off tools directory.

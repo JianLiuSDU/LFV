@@ -1,0 +1,59 @@
+experiment_name: episode0_to_maniskill_topdown_grasp
+
+runtime:
+  tapip_python: /home/users1/ljian/anaconda3/envs/tapip3d/bin/python
+  graspnet_python: /home/users1/ljian/anaconda3/envs/graspnet/bin/python
+  gpu: "0"
+
+paths:
+  transfer_config: /home/users1/ljian/LFV/configs/affordance_transfer/episode0_to_maniskill.yaml
+  transfer_output_dir: /home/users1/ljian/lfv_runs/soft_heatmap_affcorrs/episode_0_to_maniskill_seed_0
+  snapshot: /home/users1/ljian/lfv_runs/pouring_complete_grasp_validation/seed_0_dataset_aligned/pouring_snapshot.npz
+  output_dir: /home/users1/ljian/lfv_runs/soft_heatmap_affcorrs/episode_0_to_maniskill_seed_0/topdown_grasp
+  graspnet_root: /home/users1/ljian/graspnet-baseline
+  graspnet_checkpoint: checkpoint-rs.tar
+
+lifting:
+  visible_heat_threshold: 0.15
+  projection_radius: 0.006
+  seed_quantile: 0.65
+  max_seed_points: 256
+  min_contact_width: 0.004
+  max_contact_width: 0.030
+  min_antipodal_cos: 0.55
+  local_spread_radius: 0.004
+  local_spread_sigma: 0.002
+  opposite_pairs_per_seed: 3
+  min_pair_score: 0.03
+  require_hidden_opposite: false
+
+graspnet:
+  seed: 0
+  num_points: 25600
+  target_ratio: 0.25
+  heat_threshold: 0.10
+  collision_voxel: 0.008
+  collision_threshold: 0.14
+  max_global_collision_iou: 0.02
+  max_finger_collision_iou: 0.02
+  max_palm_collision_iou: 0.01
+  max_approach_collision_iou: 0.01
+  max_candidates: 500
+  max_decoded_before_refine: 300
+  max_refined_before_collision: 1200
+  pairs_per_candidate: 48
+  max_pair_distance: 0.10
+  width_margin: 0.010
+  max_gripper_width: 0.080
+  visualize_top_k: 3
+  no_hard_workspace_mask: true
+  topdown: true
+  topdown_max_angle_deg: 25.0
+  pair_max_vertical_delta: 0.005
+  min_both_tip_heat: 0.20
+  max_tip_surface_distance: 0.007
+
+visualization:
+  point_size: 9
+  render_scale: 4
+  closeup_size: 800

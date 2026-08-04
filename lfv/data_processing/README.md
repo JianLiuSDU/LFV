@@ -1,7 +1,7 @@
 # Data Processing
 
-This package is reserved for the cleaned data-processing API for the new
-two-stage framework.
+This package contains shared episode I/O used by the legacy RGB-D source-data
+preparation pipeline.
 
 Current working processors remain in `lfv/pipeline/` and should not be moved
 until the new interfaces are stable. The migration target is:
@@ -10,11 +10,8 @@ until the new interfaces are stable. The migration target is:
 - object and hand segmentation stages;
 - contact timing and anchor selection;
 - contact heat field generation;
-- HaMeR hand keypoint extraction;
-- thumb-index grasp pseudo-label generation;
 - DINO feature extraction;
 - reusable visualization exporters.
 
-The rule is: `lfv/pipeline/` remains the proven implementation; this package
-will expose stable, model-facing preprocessing APIs after the labels are stable.
-
+The active image-transfer algorithm has its own schema and preprocessing under
+`lfv/affordance_transfer/`.

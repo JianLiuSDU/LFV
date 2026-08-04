@@ -1,0 +1,53 @@
+experiment_name: drawer_open_episode60_handle_only_k160_end_to_end
+
+runtime:
+  maniskill_python: /home/users1/ljian/anaconda3/envs/maniskill3/bin/python
+  tapip_python: /home/users1/ljian/anaconda3/envs/tapip3d/bin/python
+  motion_python: /home/users1/ljian/anaconda3/envs/spot/bin/python
+  gpu: "0"
+
+task: drawer_open
+
+paths:
+  output_root: /home/users1/ljian/lfv_runs/drawer_open_v2/front_seed_0_handle_only_k160
+  transfer_config: /home/users1/ljian/LFV/configs/affordance_transfer/drawer_episode60_handle_only_k160_to_maniskill_front.yaml
+  grasp_config: /home/users1/ljian/LFV/configs/affordance_grasp/drawer_episode60_handle_only_k160_to_maniskill_front_topdown.yaml
+  grasp_object: /home/users1/ljian/lfv_runs/drawer_open_v2/front_seed_0_handle_only_k160/grasp/graspnet_selected_object.npy
+  model_repo: /home/users1/ljian/object_centric_diffusion
+  goal_checkpoint: /home/users1/ljian/object_centric_diffusion/data/outputs_local_goal_pose/drawer_lfv_v2_train_seed42/20260801_231337/checkpoints/epoch=0800-val_sample_goal_pos_err_cm=2.115.ckpt
+  trajectory_checkpoint: /home/users1/ljian/object_centric_diffusion/data/outputs_goal_full64/drawer_lfv_v2_train_seed42/20260801_232137/checkpoints/epoch=1400.ckpt
+  language_embedding: /media/ljian/lj/data_3d/drawer_lfv_v2_train/lang_emb.npy
+
+scene:
+  seed: 0
+  drawer_x: -0.06
+  drawer_y: 0.0
+  drawer_yaw: 0.0
+  initial_open: 0.0
+  num_manipulated_points: 256
+  num_reference_points: 256
+  num_full_manipulated_points: 30000
+  num_complete_scene_points: 60000
+  shader: default
+
+motion:
+  seed: 42
+  device: cuda:0
+  axis_length: 0.025
+
+execution:
+  seed: 0
+  fps: 30
+  robot_uid: panda_drawer_finger
+  pregrasp_distance: 0.08
+  approach_gripper_action: 0.0
+  grasp_offset_local: [0.0, 0.0, -0.060]
+  move_waypoints: 28
+  approach_waypoints: 18
+  settle_steps: 3
+  trajectory_substeps: 4
+  close_steps: 45
+  post_close_hold_steps: 15
+  hold_steps: 20
+  project_drawer_axis: true
+  drawer_max_pull: 0.085

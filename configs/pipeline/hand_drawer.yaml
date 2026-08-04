@@ -1,0 +1,135 @@
+task_name: hand_drawer_contact
+
+paths:
+  # Read-only source. The prepare stage only creates symlinks to these files.
+  raw_root: /media/ljian/lj/hand_data/drawer
+  processed_root: /media/ljian/lj/data_3d/hand_drawer_lfv
+
+object:
+  name: "drawer cabinet ."
+  box_threshold: 0.25
+  text_threshold: 0.25
+  model_id: IDEA-Research/grounding-dino-base
+
+objects:
+  # AffCorrs must see the complete object; the contact heat itself will select
+  # the black handle as the functional part.
+  affordance:
+    prompt: "drawer cabinet . drawer unit . green drawer box ."
+    bbox_dir: bbox
+    bbox_file: affordance_bbox.npy
+    mask_dir: sam_mask
+    mask_file: affordance_mask.npy
+    sample_dir: sample_points
+    sample_file: sampled_2d_uniform.npy
+    viz_prefix: affordance
+
+sam2:
+  checkpoint: /home/users1/ljian/sam2/checkpoints/sam2.1_hiera_large.pt
+  model_cfg: configs/sam2.1/sam2.1_hiera_l.yaml
+  score_warn_threshold: 0.5
+
+sampling:
+  num_points: 512
+
+hand:
+  prompt: "hand ."
+  fallback_prompts:
+    - "human hand ."
+    - "hand holding drawer handle ."
+  box_threshold: 0.2
+  text_threshold: 0.2
+  frame_start: 0
+  frame_end: null
+  frame_stride: 3
+  bbox_dir: hand_bbox
+  mask_dir: hand_mask
+  meta_dir: hand_contact
+  viz_dir: viz
+  viz_stride: 12
+  model_id: IDEA-Research/grounding-dino-base
+  reject_object_box_overlap_ratio: 0.45
+  reject_object_mask_paths:
+    - sam_mask/affordance_mask.npy
+
+contact_timing:
+  object_mask_path: sam_mask/affordance_mask.npy
+  hand_mask_dir: hand_mask
+  hand_bbox_dir: hand_bbox
+  output_dir: contact_timing
+  contact_distance_px: 8.0
+  contact_overlap_ratio: 0.003
+  min_consecutive: 2
+  contact_window_frames: 8
+  anchor_min_gap_frames: 3
+  anchor_min_distance_px: 18.0
+  anchor_max_overlap_ratio: 0.001
+  min_object_depth_valid_ratio: 0.2
+
+dinov2:
+  model_id: facebook/dinov2-small
+  timm_model_name: vit_small_patch14_dinov2
+  local_weight_path: /home/users1/ljian/LFV/third_party/dinov2_weights/dinov2_vits14_pretrain.pth
+  output_dir: dinov2_features
+  object_sample_path: sample_points/sampled_2d_uniform.npy
+  contact_field_path: contact_field/contact_field.npz
+  timing_path: contact_timing/contact_timing.json
+  save_dense_grid: true
+  point_feature_file: point_dinov2_features.npy
+  dense_feature_file: anchor_dinov2_grid.npz
+  meta_file: dinov2_meta.json
+
+contact_heatmap:
+  output_dir: contact_heatmap
+  timing_path: contact_timing/contact_timing.json
+  anchor_object_mask_path: sam_mask/affordance_mask.npy
+  object_mask_path: sam_mask/affordance_mask.npy
+  object_masks_dir: null
+  object_mask_pattern: frame_{frame:06d}.npy
+  hand_masks_dir: hand_mask
+  hand_mask_pattern: frame_{frame:06d}.npy
+  frame_offsets: [-3, 0, 3, 6]
+  num_frames: 4
+  num_points: 4096
+  seed: 42
+  outlier_std_ratio: 2.5
+  normal_k: 16
+  sigma_bbox_fraction: 0.08
+  sigma_min_px: 5.0
+  sigma_max_px: 18.0
+  top_k: 2
+  min_active_frames: 1
+  active_evidence_threshold: 0.25
+  seed_threshold: 0.45
+  fallback_topk: 48
+  min_seed_component_area: 8
+  gaussian_scale_factor: 1.6
+  gaussian_regularization: 9.0
+  min_axis_px: 5.0
+  max_axis_bbox_fraction: 0.45
+  heat_area_threshold: 0.2
+  surface_correction:
+    enabled: true
+    threshold: 0.4
+    knn: 12
+    max_neighbor_dist_m: 0.025
+    min_normal_dot: 0.2
+
+# contact_timing reuses the calibrated-camera loader shared with TAPIP3D.
+# Tracking is not run for the contact-source dataset, but these keys define
+# which per-episode intrinsics and depth scale the loader must use.
+tapip3d:
+  checkpoint: /home/users1/ljian/TAPIP3D/checkpoints/tapip3d_final.pth
+  intrinsics_source: depth_intrinsics_original
+  depth_scale_source: meta
+  support_grid_size: 0
+  num_iters: 6
+  visib_threshold: 0.8
+  sample_candidates:
+    - sample_points/sampled_2d_uniform.npy
+
+runtime:
+  device: cuda
+  overwrite: false
+  episodes: null
+  hf_endpoint: https://hf-mirror.com

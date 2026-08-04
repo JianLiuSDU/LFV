@@ -1,0 +1,68 @@
+experiment_name: drawer_episode60_to_maniskill_contact_grasp
+
+runtime:
+  tapip_python: /home/users1/ljian/anaconda3/envs/tapip3d/bin/python
+  graspnet_python: /home/users1/ljian/anaconda3/envs/graspnet/bin/python
+  gpu: "0"
+
+paths:
+  transfer_config: /home/users1/ljian/LFV/configs/affordance_transfer/drawer_episode60_to_maniskill.yaml
+  transfer_output_dir: /home/users1/ljian/lfv_runs/drawer_open_v1/seed_0/affordance_transfer
+  snapshot: /home/users1/ljian/lfv_runs/drawer_open_v1/seed_0/snapshot/task_snapshot.npz
+  output_dir: /home/users1/ljian/lfv_runs/drawer_open_v1/seed_0/grasp
+  graspnet_root: /home/users1/ljian/graspnet-baseline
+  graspnet_checkpoint: checkpoint-rs.tar
+
+lifting:
+  visible_heat_threshold: 0.15
+  projection_radius: 0.008
+  seed_quantile: 0.55
+  max_seed_points: 384
+  min_contact_width: 0.008
+  max_contact_width: 0.030
+  min_antipodal_cos: 0.45
+  min_normal_opposition_cos: 0.45
+  local_spread_radius: 0.006
+  local_spread_sigma: 0.003
+  local_normal_cos: 0.55
+  opposite_pairs_per_seed: 5
+  min_pair_score: 0.02
+  hidden_distance: 0.006
+  require_hidden_opposite: false
+
+graspnet:
+  seed: 0
+  num_points: 25600
+  target_ratio: 0.35
+  heat_threshold: 0.10
+  collision_voxel: 0.006
+  collision_threshold: 0.12
+  max_global_collision_iou: 0.025
+  max_finger_collision_iou: 0.025
+  max_palm_collision_iou: 0.01
+  max_approach_collision_iou: 0.01
+  max_candidates: 500
+  max_decoded_before_refine: 300
+  max_refined_before_collision: 1200
+  pairs_per_candidate: 48
+  max_pair_distance: 0.10
+  width_margin: 0.012
+  max_gripper_width: 0.080
+  visualize_top_k: 6
+  no_hard_workspace_mask: true
+  topdown: false
+  # Approach horizontally from the robot/camera side and close vertically
+  # across the black bar.  This avoids placing either finger over the cabinet
+  # top, while the furniture-scale handle height keeps the grasp reachable.
+  desired_approach_world: [1.0, 0.0, 0.0]
+  topdown_max_angle_deg: 25.0
+  desired_closing_world: [0.0, 0.0, 1.0]
+  closing_max_angle_deg: 30.0
+  pair_max_vertical_delta: 0.030
+  min_both_tip_heat: 0.15
+  max_tip_surface_distance: 0.015
+
+visualization:
+  point_size: 7
+  render_scale: 4
+  closeup_size: 900

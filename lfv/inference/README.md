@@ -1,12 +1,7 @@
-# Inference
+# Learned Functional-Motion Inference
 
-Inference code should live here. Script wrappers should live in
-`scripts/infer/`.
-
-Planned inference phases:
-
-- sample contact fields and grasp candidates;
-- sample functional object motion trajectories;
-- combine grasp and motion samples;
-- hand candidates to robot feasibility selection.
-
+`functional_motion/two_stage_pouring.py` owns the saved-data contract and frame
+conversion for the historical trained GoalPose and Full64 pouring models. The
+heavy checkpoint adapter is `scripts/inference/infer_pouring_motion.py` so LFV
+does not copy the old model implementation. Its fixed outputs are model-local
+poses, absolute ManiSkill world object poses, an overlay and a JSON report.

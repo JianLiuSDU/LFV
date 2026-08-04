@@ -1,12 +1,7 @@
 # Training
 
-Training loops and trainer utilities should live here. Script wrappers should
-live in `scripts/train/`.
+There is no active training loop in the current Soft Heatmap AffCorrs stage.
+The method uses a frozen DINOv2 encoder and deterministic matching.
 
-Planned subpackages:
-
-- `contact_grasp`: train contact heat and grasp generation.
-- `functional_motion`: train object-centric functional motion generation.
-
-Keep experiments controlled by configs under `configs/experiments/`.
-
+Future learned modules may add trainers here, but they must not be coupled to
+the current `lfv.affordance_transfer` interface.

@@ -1,0 +1,33 @@
+task_name: hand_drawer_handle_mask_ablation
+
+paths:
+  raw_root: /media/ljian/lj/hand_data/drawer
+  processed_root: /media/ljian/lj/data_3d/hand_drawer_lfv
+
+object:
+  name: "black drawer handle ."
+  box_threshold: 0.20
+  text_threshold: 0.20
+  model_id: IDEA-Research/grounding-dino-base
+
+objects:
+  handle:
+    prompt: "black drawer handle . drawer pull handle . cabinet handle ."
+    bbox_dir: handle_bbox
+    bbox_file: handle_bbox.npy
+    mask_dir: handle_sam_mask
+    mask_file: handle_mask.npy
+    sample_dir: handle_sample_points
+    sample_file: sampled_2d_uniform.npy
+    viz_prefix: handle_ablation
+
+sam2:
+  checkpoint: /home/users1/ljian/sam2/checkpoints/sam2.1_hiera_large.pt
+  model_cfg: configs/sam2.1/sam2.1_hiera_l.yaml
+  score_warn_threshold: 0.5
+
+runtime:
+  device: cuda
+  overwrite: false
+  episodes: [episode_60]
+  hf_endpoint: https://hf-mirror.com

@@ -1,0 +1,70 @@
+task_name: drawer_open
+
+paths:
+  # Read-only source. All generated artifacts go to drawer_lfv_v2.
+  raw_root: /media/ljian/lj/new_data/drawer
+  processed_root: /media/ljian/lj/data_3d/drawer_lfv_v2
+
+object:
+  name: "black drawer handle ."
+  box_threshold: 0.25
+  text_threshold: 0.25
+  model_id: IDEA-Research/grounding-dino-base
+
+objects:
+  # This is the moving part tracked by TAPIP3D and compressed by SVD.
+  affordance:
+    prompt: "black drawer handle . drawer pull . black handle ."
+    bbox_dir: bbox
+    bbox_file: affordance_bbox.npy
+    mask_dir: sam_mask
+    mask_file: affordance_mask.npy
+    sample_dir: sample_points
+    sample_file: sampled_2d_uniform.npy
+    viz_prefix: manipulated_handle
+  # The reference must remain static; exclude the sliding drawer front/handle.
+  target:
+    prompt: "green drawer cabinet . drawer cabinet frame . cabinet housing ."
+    bbox_dir: target_bbox
+    bbox_file: target_bbox.npy
+    mask_dir: target_sam_mask
+    mask_file: target_mask.npy
+    sample_dir: target_sample_points
+    sample_file: target_sampled_2d_uniform.npy
+    viz_prefix: reference_cabinet
+
+sam2:
+  checkpoint: /home/users1/ljian/sam2/checkpoints/sam2.1_hiera_large.pt
+  model_cfg: configs/sam2.1/sam2.1_hiera_l.yaml
+  score_warn_threshold: 0.5
+
+sampling:
+  num_points: 256
+
+tapip3d:
+  checkpoint: /home/users1/ljian/TAPIP3D/checkpoints/tapip3d_final.pth
+  intrinsics_source: depth_intrinsics_original
+  depth_scale_source: meta
+  support_grid_size: 0
+  num_iters: 6
+  visib_threshold: 0.8
+  sample_candidates:
+    - sample_points/sampled_2d_uniform.npy
+    - target_sample_points/target_sampled_2d_uniform.npy
+
+se3:
+  dp_horizon: 64
+  # The black handle is small and its RGB-D boundary is noisy. Keep only
+  # high-confidence TAPIP3D tracks and use a tighter rigid-fit inlier gate.
+  visib_threshold: 0.8
+  outlier_std_multiplier: 0.75
+  # Drawer opening is prismatic; rotation must not dominate arc-length
+  # resampling even though SVD still estimates the full SE(3) transform.
+  lambda_rot: 0.0
+  axis_length: 0.005
+
+runtime:
+  device: cuda
+  overwrite: false
+  episodes: null
+  hf_endpoint: https://hf-mirror.com

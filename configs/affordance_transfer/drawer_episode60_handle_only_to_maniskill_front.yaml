@@ -1,0 +1,48 @@
+seed: 0
+
+source:
+  episode_dir: /media/ljian/lj/data_3d/hand_drawer_lfv/episode_60
+  frame_index: 45
+  mask_path: handle_sam_mask/handle_mask.npy
+  heatmap_path: contact_heatmap/contact_heatmap.npz
+  heatmap_key: heatmap_2d
+
+target:
+  snapshot_path: /home/users1/ljian/lfv_runs/drawer_open_v2/front_seed_0/snapshot/task_snapshot.npz
+  rgb_key: rgb
+  # Only the independently segmented black handle participates in target
+  # over-clustering and output normalization for this mask-only ablation.
+  mask_key: manipulated_mask
+
+features:
+  backend: dinov2
+  model_name: vit_small_patch14_dinov2
+  weights_path: /home/users1/ljian/LFV/third_party/dinov2_weights/dinov2_vits14_pretrain.pth
+
+preprocessing:
+  input_size: 518
+  bbox_margin: 0.15
+  mask_occupancy_threshold: 0.35
+
+matching:
+  source_clusters: 6
+  target_clusters: 64
+  positive_threshold: 0.20
+  forward_temperature: 0.10
+  backward_temperature: 0.05
+  n_init: 4
+  max_iter: 100
+  seed: 0
+
+confidence:
+  minimum_retained_heat: 0.50
+  minimum_cycle_score: 0.05
+  minimum_peak_score: 0.05
+  maximum_entropy: 0.98
+  minimum_global_score: 0.05
+
+runtime:
+  device: cuda
+
+output:
+  directory: /home/users1/ljian/lfv_runs/drawer_open_v2/front_seed_0/affordance_transfer_handle_only

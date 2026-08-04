@@ -11,6 +11,7 @@ from PIL import Image
 import zarr
 
 from lfv.data_processing.episode_io import iter_processed_episodes
+from lfv.features import DinoV2DenseExtractor
 from lfv.utils.imagecodecs import register_image_codecs
 
 
@@ -44,23 +45,14 @@ def _load_model(cfg, device: str):
     if local_weight_path:
         weight_path = Path(str(local_weight_path))
         if weight_path.exists():
-            import timm
-
             timm_name = str(_cfg_get(cfg, "dinov2.timm_model_name", "vit_small_patch14_dinov2"))
-            model = timm.create_model(timm_name, pretrained=False, dynamic_img_size=True)
-            try:
-                state_dict = torch.load(weight_path, map_location="cpu", weights_only=True)
-            except TypeError:
-                state_dict = torch.load(weight_path, map_location="cpu")
-            missing, unexpected = model.load_state_dict(state_dict, strict=False)
-            if missing:
-                raise RuntimeError(f"Missing keys while loading local DINOv2 weights: {missing[:8]}")
-            if unexpected:
-                print(f"[dinov2] warning: ignored unexpected local weight keys: {unexpected[:8]}")
-            model = model.to(device)
-            model._lfv_backend = "timm"
+            model = DinoV2DenseExtractor(
+                model_name=timm_name,
+                weights_path=weight_path,
+                device=device,
+            )
+            model._lfv_backend = "lfv_dinov2_dense"
             model._lfv_weight_source = str(weight_path)
-            model.eval()
             return None, model
 
     try:
@@ -122,6 +114,23 @@ def _load_point_pixels(ep_path: Path, cfg) -> tuple[np.ndarray, str]:
 def _extract_grid(frame_rgb: np.ndarray, processor, model, device: str) -> tuple[np.ndarray, dict]:
     backend = getattr(model, "_lfv_backend", "hf_transformers")
     h, w = frame_rgb.shape[:2]
+    if backend == "lfv_dinov2_dense":
+        patch = int(model.patch_size)
+        pad_h = (patch - (h % patch)) % patch
+        pad_w = (patch - (w % patch)) % patch
+        padded = np.pad(frame_rgb, ((0, pad_h), (0, pad_w), (0, 0)), mode="edge")
+        grid = model.extract(padded)
+        return grid, {
+            "image_height": int(h),
+            "image_width": int(w),
+            "padded_height": int(padded.shape[0]),
+            "padded_width": int(padded.shape[1]),
+            "patch_size": patch,
+            "grid_height": int(grid.shape[0]),
+            "grid_width": int(grid.shape[1]),
+            "feature_dim": int(grid.shape[-1]),
+            "backend": backend,
+        }
     if processor is None or backend == "timm":
         img = torch.from_numpy(frame_rgb).float().permute(2, 0, 1) / 255.0
         mean = torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(3, 1, 1)

@@ -1,5 +1,6 @@
 numpy
 scipy
+POT>=0.9.6,<0.10
 opencv-python
 matplotlib
 pillow
@@ -23,7 +24,6 @@ rerun-sdk~=0.21
 imageio[ffmpeg]
 trimesh
 huggingface_hub
+pytest
 python-box[all]~=7.0
 timm
-wandb
-accelerate==1.0.1

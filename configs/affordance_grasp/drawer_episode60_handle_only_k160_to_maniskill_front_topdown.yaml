@@ -1,0 +1,75 @@
+experiment_name: drawer_episode60_handle_only_k160_front_topdown_grasp
+
+runtime:
+  tapip_python: /home/users1/ljian/anaconda3/envs/tapip3d/bin/python
+  graspnet_python: /home/users1/ljian/anaconda3/envs/graspnet/bin/python
+  gpu: "0"
+
+paths:
+  transfer_config: /home/users1/ljian/LFV/configs/affordance_transfer/drawer_episode60_handle_only_k160_to_maniskill_front.yaml
+  transfer_output_dir: /home/users1/ljian/lfv_runs/drawer_open_v2/front_seed_0_handle_only_k160/affordance_transfer
+  snapshot: /home/users1/ljian/lfv_runs/drawer_open_v2/front_seed_0_handle_only_k160/snapshot/task_snapshot.npz
+  output_dir: /home/users1/ljian/lfv_runs/drawer_open_v2/front_seed_0_handle_only_k160/grasp
+  graspnet_root: /home/users1/ljian/graspnet-baseline
+  graspnet_checkpoint: checkpoint-rs.tar
+
+lifting:
+  visible_heat_threshold: 0.15
+  projection_radius: 0.008
+  seed_quantile: 0.55
+  max_seed_points: 384
+  min_contact_width: 0.006
+  max_contact_width: 0.026
+  min_antipodal_cos: 0.45
+  min_normal_opposition_cos: 0.45
+  local_spread_radius: 0.006
+  local_spread_sigma: 0.003
+  local_normal_cos: 0.55
+  opposite_pairs_per_seed: 5
+  min_pair_score: 0.02
+  hidden_distance: 0.005
+  require_hidden_opposite: false
+
+graspnet:
+  seed: 0
+  num_points: 25600
+  target_ratio: 0.35
+  heat_threshold: 0.10
+  collision_voxel: 0.006
+  collision_threshold: 0.12
+  max_global_collision_iou: 0.025
+  max_finger_collision_iou: 0.080
+  max_palm_collision_iou: 0.010
+  max_approach_collision_iou: 0.010
+  max_candidates: 500
+  max_decoded_before_refine: 300
+  max_refined_before_collision: 1200
+  pairs_per_candidate: 48
+  max_pair_distance: 0.10
+  width_margin: 0.012
+  max_gripper_width: 0.080
+  visualize_top_k: 6
+  no_hard_workspace_mask: true
+  no_grasp_nms: true
+  topdown: true
+  desired_approach_world: [0.0, 0.0, -1.0]
+  topdown_max_angle_deg: 25.0
+  desired_closing_world: [1.0, 0.0, 0.0]
+  closing_max_angle_deg: 25.0
+  pair_max_vertical_delta: 0.010
+  min_pair_closing_alignment: 0.90
+  max_nearest_pair_distance: 0.012
+  min_both_tip_heat: 0.20
+  max_tip_surface_distance: 0.015
+  # The K=160 heat centroid lies at the horizontal centre of the bar. Prefer
+  # the upper part of that centre region: the first rollout showed that a
+  # centre candidate 8 mm lower only established bilateral contact after the
+  # pull began, whereas the upper antipodal candidates close immediately.
+  preferred_contact_center_object: [0.0295, 0.0, 0.049]
+  max_preferred_center_distance: 0.008
+  snap_preferred_contact_center: false
+
+visualization:
+  point_size: 7
+  render_scale: 4
+  closeup_size: 900
