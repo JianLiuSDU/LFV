@@ -98,7 +98,7 @@ third_party/tapip3d/co-tracker/assets/*.mp4
 third_party/tapip3d/co-tracker/gradio_demo/videos/
 
 # Large local data roots if created under the repo
-datasets/
+/datasets/
 raw_data/
 processed_data/
 external_data/

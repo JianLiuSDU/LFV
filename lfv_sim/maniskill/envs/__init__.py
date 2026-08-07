@@ -2,5 +2,6 @@
 
 from .pouring import LFVPourCupBowlEnv
 from .drawer import LFVOpenDrawerEnv
+from .pick_place import LFVPickBananaPlateEnv
 
-__all__ = ["LFVPourCupBowlEnv", "LFVOpenDrawerEnv"]
+__all__ = ["LFVPourCupBowlEnv", "LFVOpenDrawerEnv", "LFVPickBananaPlateEnv"]

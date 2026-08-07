@@ -1,0 +1,53 @@
+experiment_name: stage2_v2_blue_mug_pouring_execution
+
+runtime:
+  maniskill_python: /home/users1/ljian/anaconda3/envs/maniskill3/bin/python
+  tapip_python: /home/users1/ljian/anaconda3/envs/tapip3d/bin/python
+  gpu: "0"
+
+paths:
+  output_root: /home/users1/ljian/lfv_runs/stage2/pouring_lfv_v1/blue_mug_seed_0
+  stage2_checkpoint: /home/users1/ljian/lfv_runs/stage2/pouring_lfv_v1/full_joint_v2/checkpoints/best.pt
+  grasp_object: /home/users1/ljian/lfv_runs/affcorrs_fgw/episode_0_to_cole_blue_mug_seed_0/topdown_grasp/graspnet_selected_object.npy
+
+scene:
+  seed: 0
+  cup_asset_kind: mesh
+  cup_asset_id: Cole_Hardware_Mug_Classic_Blue
+  cup_visual_file: /home/users1/ljian/object_centric_diffusion/env/mujoco_sim/assets/mujoco_scanned_objects/train/mujoco_scanned_objects/models/Cole_Hardware_Mug_Classic_Blue/model.obj
+  cup_collision_glob: /home/users1/ljian/object_centric_diffusion/env/mujoco_sim/assets/mujoco_scanned_objects/train/mujoco_scanned_objects/models/Cole_Hardware_Mug_Classic_Blue/model_collision_*.obj
+  cup_scale: 1.0
+  cup_density: 1000.0
+  cup_base_color: [0.08, 0.18, 0.65, 1.0]
+  cup_x: 0.04
+  cup_y: -0.12
+  cup_yaw: -1.5707963267948966
+  bowl_x: 0.06
+  bowl_y: 0.18
+  num_visible_points: 256
+  num_target_points: 256
+  num_full_points: 30000
+  shader: default
+
+motion:
+  seed: 42
+  device: cuda:0
+  num_goals: 16
+  num_trajectories: 2
+  axis_length: 0.018
+  no_ema: true
+
+execution:
+  seed: 0
+  fps: 30
+  robot_uid: panda_long_finger
+  pregrasp_distance: 0.08
+  approach_gripper_action: 1.0
+  grasp_offset_local: [0.005, -0.005, 0.0]
+  move_waypoints: 20
+  approach_waypoints: 12
+  settle_steps: 2
+  trajectory_substeps: 3
+  close_steps: 35
+  post_close_hold_steps: 10
+  hold_steps: 20

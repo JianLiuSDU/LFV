@@ -37,6 +37,17 @@ TASK_SPECS = {
         manipulated_entity_attr="cup",
         reference_entity_attr="bowl",
     ),
+    "picknplace": ManiSkillTaskSpec(
+        name="picknplace",
+        env_id="LFVPickBananaPlate-v1",
+        robot_uids="panda",
+        instruction="Pick up the banana and place it on the plate",
+        manipulated_query="banana",
+        target_query="plate",
+        object_query="banana",
+        manipulated_entity_attr="banana",
+        reference_entity_attr="plate",
+    ),
     "drawer_open": ManiSkillTaskSpec(
         name="drawer_open",
         env_id="LFVOpenDrawer-v1",

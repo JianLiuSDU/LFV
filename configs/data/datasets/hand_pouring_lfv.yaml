@@ -1,0 +1,23 @@
+name: hand_pouring_lfv
+task: hand_pouring
+
+paths:
+  raw_root: /media/ljian/lj/hand_data/pouring
+  processed_root: /media/ljian/lj/data_3d/hand_pouring_lfv
+
+artifacts:
+  rgb: rgb
+  depth: depth
+  camera_meta: meta.json
+  manipulated_object_mask: sam_mask/affordance_mask.npy
+  target_object_mask: target_sam_mask/target_mask.npy
+  contact_timing: contact_timing/contact_timing.json
+  contact_heatmap: contact_heatmap/contact_heatmap.npz
+  dinov2_point_features: dinov2_features/point_dinov2_features.npy
+  grasp_pseudo_label: hamer_grasp_pseudo_label/grasp_pseudo_label.npz
+  grasp_pseudo_label_meta: hamer_grasp_pseudo_label/grasp_pseudo_label_meta.json
+
+quality:
+  require_contact_heat: true
+  require_dinov2: true
+  require_grasp_label: false

@@ -9,6 +9,7 @@ zarr
 numcodecs
 imagecodecs
 torch
+diffusers>=0.30,<0.31
 transformers
 hydra-core
 omegaconf

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Union
 
@@ -40,9 +41,31 @@ def _require_ycb_assets() -> None:
         )
 
 
-def _build_ycb_actor(scene, model_id: str, name: str, initial_pose, body_type: str):
+def _build_ycb_actor(
+    scene,
+    model_id: str,
+    name: str,
+    initial_pose,
+    body_type: str,
+    scale_multiplier: float = 1.0,
+):
     _require_ycb_assets()
-    builder = actors.get_actor_builder(scene, id=f"ycb:{model_id}")
+    if abs(float(scale_multiplier) - 1.0) < 1e-8:
+        builder = actors.get_actor_builder(scene, id=f"ycb:{model_id}")
+    else:
+        metadata = json.loads(YCB_ASSET_INFO.read_text(encoding="utf-8"))[model_id]
+        scale = float(metadata.get("scales", [1.0])[0]) * float(scale_multiplier)
+        density = float(metadata.get("density", 1000.0))
+        model_dir = YCB_ASSET_INFO.parent / "models" / model_id
+        builder = scene.create_actor_builder()
+        builder.add_multiple_convex_collisions_from_file(
+            filename=str(model_dir / "collision.ply"),
+            scale=[scale] * 3,
+            density=density,
+        )
+        builder.add_visual_from_file(
+            filename=str(model_dir / "textured.obj"), scale=[scale] * 3
+        )
     builder.set_initial_pose(initial_pose)
     if body_type == "dynamic":
         return builder.build(name=name)

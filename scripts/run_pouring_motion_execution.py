@@ -91,7 +91,7 @@ def main() -> int:
             _append(command, key, value)
         _run("00_snapshot_far_scene", command, output_root, process_env)
 
-    if not args.skip_transfer:
+    if not args.skip_transfer and cfg.paths.get("transfer_config"):
         _run(
             "01_soft_heatmap_transfer",
             [
@@ -106,42 +106,74 @@ def main() -> int:
             process_env,
         )
 
+    stage2_checkpoint = cfg.paths.get("stage2_checkpoint")
     if not args.skip_motion:
-        command = [
-            str(cfg.runtime.motion_python),
-            "scripts/inference/infer_pouring_motion.py",
-            "--snapshot",
-            str(snapshot_dir / "pouring_snapshot.npz"),
-            "--transfer-result",
-            str(transfer_dir / "transfer_result.npz"),
-            "--output-dir",
-            str(motion_dir),
-            "--model-repo",
-            str(cfg.paths.model_repo),
-            "--goal-checkpoint",
-            str(cfg.paths.goal_checkpoint),
-            "--trajectory-checkpoint",
-            str(cfg.paths.trajectory_checkpoint),
-            "--language-embedding",
-            str(cfg.paths.language_embedding),
-        ]
-        for key, value in cfg.motion.items():
-            _append(command, key, value)
-        _run("02_trained_two_stage_motion", command, output_root, process_env)
+        if stage2_checkpoint:
+            command = [
+                str(cfg.runtime.tapip_python),
+                "scripts/stage2/infer_sim_snapshot.py",
+                "--checkpoint",
+                str(stage2_checkpoint),
+                "--snapshot",
+                str(snapshot_dir / "pouring_snapshot.npz"),
+                "--output-dir",
+                str(motion_dir),
+            ]
+            for key, value in cfg.motion.items():
+                _append(command, key, value)
+            _run("02_stage2_goal_trajectory_diffusion", command, output_root, process_env)
+        else:
+            command = [
+                str(cfg.runtime.motion_python),
+                "scripts/inference/infer_pouring_motion.py",
+                "--snapshot",
+                str(snapshot_dir / "pouring_snapshot.npz"),
+                "--transfer-result",
+                str(transfer_dir / "transfer_result.npz"),
+                "--output-dir",
+                str(motion_dir),
+                "--model-repo",
+                str(cfg.paths.model_repo),
+                "--goal-checkpoint",
+                str(cfg.paths.goal_checkpoint),
+                "--trajectory-checkpoint",
+                str(cfg.paths.trajectory_checkpoint),
+                "--language-embedding",
+                str(cfg.paths.language_embedding),
+            ]
+            for key, value in cfg.motion.items():
+                _append(command, key, value)
+            _run("02_trained_two_stage_motion", command, output_root, process_env)
 
     if not args.skip_execution:
-        command = [
-            str(cfg.runtime.maniskill_python),
-            "scripts/robot/execute_pouring_motion_maniskill.py",
-            "--snapshot-report",
-            str(snapshot_dir / "snapshot_report.json"),
-            "--motion-prediction",
-            str(motion_dir / "pouring_motion_prediction.npz"),
-            "--grasp-object",
-            str(cfg.paths.grasp_object),
-            "--output-dir",
-            str(execution_dir),
-        ]
+        if stage2_checkpoint:
+            command = [
+                str(cfg.runtime.maniskill_python),
+                "scripts/robot/execute_functional_motion_maniskill.py",
+                "--task",
+                "pouring",
+                "--snapshot-report",
+                str(snapshot_dir / "snapshot_report.json"),
+                "--motion-prediction",
+                str(motion_dir / "functional_motion_prediction.npz"),
+                "--grasp-object",
+                str(cfg.paths.grasp_object),
+                "--output-dir",
+                str(execution_dir),
+            ]
+        else:
+            command = [
+                str(cfg.runtime.maniskill_python),
+                "scripts/robot/execute_pouring_motion_maniskill.py",
+                "--snapshot-report",
+                str(snapshot_dir / "snapshot_report.json"),
+                "--motion-prediction",
+                str(motion_dir / "pouring_motion_prediction.npz"),
+                "--grasp-object",
+                str(cfg.paths.grasp_object),
+                "--output-dir",
+                str(execution_dir),
+            ]
         for key, value in cfg.execution.items():
             _append(command, key, value)
         _run("03_maniskill_execution_video", command, output_root, process_env)

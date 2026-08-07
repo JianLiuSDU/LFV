@@ -1,0 +1,41 @@
+model:
+  name: three_token_hierarchical_diffusion
+  hidden_dim: 64
+  encoder_heads: 4
+  goal_layers: 2
+  trajectory_layers: 2
+  decoder_heads: 4
+  dropout: 0.0
+  num_train_timesteps: 20
+  goal_inference_steps: 10
+  trajectory_inference_steps: 10
+  trajectory_position_encoding: discrete_sinusoidal
+
+data:
+  type: synthetic
+  num_samples: 32
+  num_points: 64
+  dino_dim: 32
+
+runtime:
+  seed: 42
+  device: cpu
+  allow_cpu_fallback: true
+
+optimization:
+  learning_rate: 0.001
+  min_learning_rate: 0.00001
+  weight_decay: 0.0
+  grad_clip_norm: 1.0
+  ema_decay: 0.99
+  amp: false
+
+training:
+  stage: joint
+  batch_size: 8
+  num_workers: 0
+  epochs: 120
+  early_stopping_patience: 120
+
+paths:
+  output_dir: /home/users1/ljian/lfv_runs/stage2/synthetic_overfit

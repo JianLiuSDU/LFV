@@ -115,7 +115,9 @@ def _overlay(rgb: np.ndarray, masks: list[tuple[np.ndarray, tuple[int, int, int]
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--task", choices=("pouring", "drawer_open"), required=True)
+    parser.add_argument(
+        "--task", choices=("pouring", "drawer_open", "picknplace"), required=True
+    )
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--shader", default="default")
@@ -127,6 +129,12 @@ def main() -> int:
     parser.add_argument("--drawer-y", type=float, default=0.02)
     parser.add_argument("--drawer-yaw", type=float, default=0.0)
     parser.add_argument("--initial-open", type=float, default=0.0)
+    parser.add_argument("--banana-x", type=float, default=-0.10)
+    parser.add_argument("--banana-y", type=float, default=-0.20)
+    parser.add_argument("--banana-yaw", type=float, default=float(np.pi / 2))
+    parser.add_argument("--plate-x", type=float, default=-0.10)
+    parser.add_argument("--plate-y", type=float, default=0.20)
+    parser.add_argument("--plate-yaw", type=float, default=0.0)
     args = parser.parse_args()
 
     output_dir = Path(args.output_dir).expanduser().resolve()
@@ -138,6 +146,13 @@ def main() -> int:
             "drawer_xy": [args.drawer_x, args.drawer_y],
             "drawer_yaw": args.drawer_yaw,
             "initial_open": args.initial_open,
+        }
+    elif args.task == "picknplace":
+        layout = {
+            "banana_xy": [args.banana_x, args.banana_y],
+            "banana_yaw": args.banana_yaw,
+            "plate_xy": [args.plate_x, args.plate_y],
+            "plate_yaw": args.plate_yaw,
         }
     rng = np.random.default_rng(args.seed)
 
