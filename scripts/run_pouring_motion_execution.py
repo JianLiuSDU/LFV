@@ -64,6 +64,7 @@ def main() -> int:
     )
     parser.add_argument("--skip-snapshot", action="store_true")
     parser.add_argument("--skip-transfer", action="store_true")
+    parser.add_argument("--skip-grasp", action="store_true")
     parser.add_argument("--skip-motion", action="store_true")
     parser.add_argument("--skip-execution", action="store_true")
     args = parser.parse_args()
@@ -106,6 +107,21 @@ def main() -> int:
             process_env,
         )
 
+    if not args.skip_grasp and cfg.paths.get("grasp_config"):
+        _run(
+            "02_contact_constrained_topdown_grasp",
+            [
+                str(cfg.runtime.tapip_python),
+                "scripts/sim/run_transferred_heat_topdown_grasp.py",
+                "--config",
+                str(cfg.paths.grasp_config),
+                "--skip-snapshot",
+                "--skip-transfer",
+            ],
+            output_root,
+            process_env,
+        )
+
     stage2_checkpoint = cfg.paths.get("stage2_checkpoint")
     if not args.skip_motion:
         if stage2_checkpoint:
@@ -121,7 +137,7 @@ def main() -> int:
             ]
             for key, value in cfg.motion.items():
                 _append(command, key, value)
-            _run("02_stage2_goal_trajectory_diffusion", command, output_root, process_env)
+            _run("03_stage2_goal_trajectory_diffusion", command, output_root, process_env)
         else:
             command = [
                 str(cfg.runtime.motion_python),
@@ -143,7 +159,7 @@ def main() -> int:
             ]
             for key, value in cfg.motion.items():
                 _append(command, key, value)
-            _run("02_trained_two_stage_motion", command, output_root, process_env)
+            _run("03_trained_two_stage_motion", command, output_root, process_env)
 
     if not args.skip_execution:
         if stage2_checkpoint:
@@ -176,7 +192,7 @@ def main() -> int:
             ]
         for key, value in cfg.execution.items():
             _append(command, key, value)
-        _run("03_maniskill_execution_video", command, output_root, process_env)
+        _run("04_maniskill_execution_video", command, output_root, process_env)
 
     print(f"\nComplete quick-iteration run: {output_root}")
     return 0

@@ -1,0 +1,59 @@
+experiment_name: stage2_a3b_red_mug_pouring_execution
+
+runtime:
+  maniskill_python: /home/users1/ljian/anaconda3/envs/maniskill3/bin/python
+  tapip_python: /home/users1/ljian/anaconda3/envs/tapip3d/bin/python
+  gpu: "0"
+
+paths:
+  output_root: /home/users1/ljian/lfv_runs/stage2/pouring_lfv_v1/red_mug_a3b_seed_0
+  transfer_config: /home/users1/ljian/LFV/configs/affordance_transfer/episode0_to_ace_red_mug_fgw_k64.yaml
+  grasp_config: /home/users1/ljian/LFV/configs/affordance_grasp/episode0_to_ace_red_mug_fgw_k64_topdown.yaml
+  stage2_checkpoint: /home/users1/ljian/lfv_runs/stage2/ablation_stage_aware/a3b_gated_phase_tokens/checkpoints/best.pt
+  grasp_object: /home/users1/ljian/lfv_runs/stage2/pouring_lfv_v1/red_mug_a3b_seed_0/grasp/graspnet_selected_object.npy
+
+scene:
+  seed: 0
+  cup_asset_kind: mesh
+  cup_asset_id: ACE_Coffee_Mug_Kristen_16_oz_cup_scale
+  cup_visual_file: /home/users1/ljian/object_centric_diffusion/env/mujoco_sim/assets/mujoco_scanned_objects/train/ACE_Coffee_Mug_Kristen_16_oz_cup_scale/model.obj
+  cup_collision_glob: /home/users1/ljian/object_centric_diffusion/env/mujoco_sim/assets/mujoco_scanned_objects/train/ACE_Coffee_Mug_Kristen_16_oz_cup_scale/model_collision_*.obj
+  cup_scale: 1.0
+  cup_density: 1000.0
+  cup_base_color: [0.75, 0.08, 0.06, 1.0]
+  cup_x: 0.04
+  cup_y: -0.12
+  cup_yaw: -1.5707963267948966
+  bowl_x: 0.06
+  bowl_y: 0.18
+  num_visible_points: 256
+  num_target_points: 256
+  num_full_points: 30000
+  shader: default
+
+motion:
+  task: pouring
+  manipulated_label: red_mug
+  reference_label: bowl
+  seed: 42
+  device: cuda:0
+  num_goals: 16
+  num_trajectories: 2
+  goal_inference_steps: 50
+  trajectory_inference_steps: 50
+  axis_length: 0.018
+
+execution:
+  seed: 0
+  fps: 30
+  robot_uid: panda_long_finger
+  pregrasp_distance: 0.08
+  approach_gripper_action: 1.0
+  grasp_offset_local: [0.005, -0.005, 0.0]
+  move_waypoints: 20
+  approach_waypoints: 12
+  settle_steps: 2
+  trajectory_substeps: 3
+  close_steps: 35
+  post_close_hold_steps: 10
+  hold_steps: 20
