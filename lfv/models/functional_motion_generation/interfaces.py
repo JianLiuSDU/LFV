@@ -10,6 +10,10 @@ import torch
 @dataclass
 class ContextEncoding:
     tokens: torch.Tensor
+    manipulated_motion_field: torch.Tensor | None = None
+    reference_motion_field: torch.Tensor | None = None
+    manipulated_motion_logits: torch.Tensor | None = None
+    reference_motion_logits: torch.Tensor | None = None
     attention_manipulated_to_reference: torch.Tensor | None = None
     attention_reference_to_manipulated: torch.Tensor | None = None
     reference_importance: torch.Tensor | None = None

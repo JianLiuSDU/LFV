@@ -1,0 +1,61 @@
+model:
+  name: three_token_hierarchical_diffusion
+  hidden_dim: 128
+  encoder_heads: 4
+  motion_field_mode: independent
+  motion_field_temperature: 1.0
+  goal_layers: 4
+  trajectory_layers: 6
+  decoder_heads: 4
+  dropout: 0.0
+  num_train_timesteps: 100
+  goal_inference_steps: 20
+  trajectory_inference_steps: 20
+  trajectory_hard_start_token: true
+  trajectory_position_encoding: discrete_sinusoidal
+  trajectory_goal_context_layers: 2
+  trajectory_goal_context_residual_gating: true
+  trajectory_num_phase_tokens: 4
+  trajectory_phase_attention_sigma: 0.22
+  trajectory_phase_residual_gating: true
+  trajectory_temporal_attention_mode: full
+  trajectory_temporal_local_window: 7
+  trajectory_residual_gating: false
+  trajectory_residual_gate_init: 0.1
+  trajectory_velocity_weight: 0.5
+  trajectory_endpoint_weight: 1.0
+  trajectory_start_reconstruction_weight: 20.0
+  trajectory_start_boundary_weight: 2.0
+  trajectory_acceleration_weight: 0.1
+
+data:
+  type: cached
+  cache_root: /home/users1/ljian/lfv_data_cache/stage2/pouring_lfv_v1
+  dino_dim: 384
+  shuffle_points: true
+  train_limit: 32
+  val_limit: 32
+  overfit_same_as_train: true
+
+runtime:
+  seed: 42
+  device: cuda
+  allow_cpu_fallback: false
+
+optimization:
+  learning_rate: 0.0002
+  min_learning_rate: 0.000001
+  weight_decay: 0.0001
+  grad_clip_norm: 1.0
+  ema_decay: 0.995
+  amp: true
+
+training:
+  stage: joint
+  batch_size: 8
+  num_workers: 0
+  epochs: 160
+  early_stopping_patience: 80
+
+paths:
+  output_dir: /home/users1/ljian/lfv_runs/stage2/motion_functional_field/v1_overfit32

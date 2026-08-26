@@ -17,6 +17,10 @@ def model_kwargs(config: dict, dino_dim: int) -> dict:
         "dino_dim": int(dino_dim),
         "hidden_dim": int(model.get("hidden_dim", 128)),
         "encoder_heads": int(model.get("encoder_heads", 4)),
+        "motion_field_mode": str(model.get("motion_field_mode", "none")),
+        "motion_field_temperature": float(
+            model.get("motion_field_temperature", 1.0)
+        ),
         "goal_layers": int(model.get("goal_layers", 4)),
         "trajectory_layers": int(model.get("trajectory_layers", 6)),
         "decoder_heads": int(model.get("decoder_heads", 4)),

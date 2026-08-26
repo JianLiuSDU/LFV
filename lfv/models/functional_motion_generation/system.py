@@ -21,6 +21,8 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         dino_dim: int,
         hidden_dim: int = 128,
         encoder_heads: int = 4,
+        motion_field_mode: str = "none",
+        motion_field_temperature: float = 1.0,
         goal_layers: int = 4,
         trajectory_layers: int = 6,
         decoder_heads: int = 4,
@@ -53,6 +55,8 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             xyz_projected_dim=hidden_dim - hidden_dim // 2,
             num_heads=encoder_heads,
             dropout=dropout,
+            motion_field_mode=motion_field_mode,
+            motion_field_temperature=motion_field_temperature,
         )
         self.goal_diffuser = GoalPoseDiffuser(
             GoalPoseDecoder(
@@ -102,7 +106,8 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         )
 
     def compute_loss(self, batch: dict, stage: str = "joint") -> dict[str, torch.Tensor]:
-        context = self.encode(batch).tokens
+        encoding = self.encode(batch)
+        context = encoding.tokens
         losses: dict[str, torch.Tensor] = {}
         if stage in ("goal", "joint"):
             losses.update(
@@ -127,6 +132,30 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             losses["total"] = losses["goal_total"] + losses["trajectory_total"]
         else:
             raise ValueError(f"Unknown training stage: {stage}")
+        fields = [
+            field
+            for field in (
+                encoding.manipulated_motion_field,
+                encoding.reference_motion_field,
+            )
+            if field is not None
+        ]
+        if fields:
+            normalized_entropies = []
+            peaks = []
+            for field in fields:
+                entropy = -(field * field.clamp_min(1e-12).log()).sum(dim=1)
+                entropy = entropy / torch.log(
+                    torch.as_tensor(
+                        field.shape[1], device=field.device, dtype=field.dtype
+                    )
+                )
+                normalized_entropies.append(entropy.mean())
+                peaks.append(field.max(dim=1).values.mean())
+            losses["motion_field_entropy"] = torch.stack(
+                normalized_entropies
+            ).mean().detach()
+            losses["motion_field_peak"] = torch.stack(peaks).mean().detach()
         return losses
 
     @torch.no_grad()

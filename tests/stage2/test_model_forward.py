@@ -79,3 +79,35 @@ def test_sampling_is_reproducible_with_generator_seed():
     )
     torch.testing.assert_close(first.goals, second.goals)
     torch.testing.assert_close(first.trajectories, second.trajectories)
+
+
+def test_joint_motion_loss_reaches_both_relevance_heads():
+    batch = _batch()
+    model = ThreeTokenHierarchicalDiffusion(
+        dino_dim=16,
+        hidden_dim=32,
+        encoder_heads=4,
+        motion_field_mode="independent",
+        goal_layers=1,
+        trajectory_layers=1,
+        decoder_heads=4,
+        dropout=0.0,
+        num_train_timesteps=10,
+        goal_inference_steps=2,
+        trajectory_inference_steps=2,
+    )
+    model.normalizer.fit_tensors([batch["trajectory_pose9d"]])
+    losses = model.compute_loss(batch, stage="joint")
+    losses["total"].backward()
+    for relation in (
+        model.encoder.manipulated_queries_reference,
+        model.encoder.reference_queries_manipulated,
+    ):
+        assert relation.relevance_head is not None
+        gradients = [
+            parameter.grad
+            for parameter in relation.relevance_head.parameters()
+            if parameter.requires_grad
+        ]
+        assert all(gradient is not None for gradient in gradients)
+        assert sum(float(gradient.abs().sum()) for gradient in gradients) > 0.0
