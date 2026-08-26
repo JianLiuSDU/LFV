@@ -31,9 +31,9 @@ class DirectionalRelation(nn.Module):
         motion_field_temperature: float = 1.0,
     ) -> None:
         super().__init__()
-        if motion_field_mode not in {"none", "independent"}:
+        if motion_field_mode not in {"none", "independent", "joint"}:
             raise ValueError(
-                "motion_field_mode must be one of {'none', 'independent'}"
+                "motion_field_mode must be one of {'none', 'independent', 'joint'}"
             )
         if motion_field_temperature <= 0:
             raise ValueError("motion_field_temperature must be positive")
@@ -61,7 +61,7 @@ class DirectionalRelation(nn.Module):
                 nn.GELU(),
                 nn.Linear(hidden_dim // 2, 1),
             )
-            if motion_field_mode == "independent"
+            if motion_field_mode != "none"
             else None
         )
 
@@ -85,8 +85,11 @@ class DirectionalRelation(nn.Module):
                 attention=weights,
             )
         logits = self.relevance_head(relation_points).squeeze(-1)
-        field = torch.softmax(logits / self.motion_field_temperature, dim=1)
-        token = torch.sum(field.unsqueeze(-1) * relation_points, dim=1)
+        field = None
+        token = relation_points.max(dim=1).values
+        if self.motion_field_mode == "independent":
+            field = torch.softmax(logits / self.motion_field_temperature, dim=1)
+            token = torch.sum(field.unsqueeze(-1) * relation_points, dim=1)
         return DirectionalRelationEncoding(
             token=token,
             points=relation_points,
@@ -107,10 +110,16 @@ class BidirectionalSceneEncoder(nn.Module):
         dropout: float = 0.1,
         motion_field_mode: str = "none",
         motion_field_temperature: float = 1.0,
+        motion_field_pair_weight: float = 0.25,
     ) -> None:
         super().__init__()
         if dino_projected_dim + xyz_projected_dim != hidden_dim:
             raise ValueError("DINO and XYZ projected dimensions must sum to hidden_dim")
+        if motion_field_pair_weight < 0:
+            raise ValueError("motion_field_pair_weight must be non-negative")
+        self.motion_field_mode = motion_field_mode
+        self.motion_field_temperature = float(motion_field_temperature)
+        self.motion_field_pair_weight = float(motion_field_pair_weight)
         self.dino_projector = nn.Sequential(
             nn.LayerNorm(dino_dim),
             nn.Linear(dino_dim, 256),
@@ -168,15 +177,61 @@ class BidirectionalSceneEncoder(nn.Module):
             manipulated_input
         )
         reference_features, reference_global = self.reference_pointnet(reference_input)
-        initial = self.initial_fusion(
-            torch.cat((manipulated_global, reference_global), dim=-1)
-        )
         manipulated_relation = self.manipulated_queries_reference(
             manipulated_features, reference_features
         )
         reference_relation = self.reference_queries_manipulated(
             reference_features, manipulated_features
         )
+        joint_relation = None
+        if self.motion_field_mode == "joint":
+            if (
+                manipulated_relation.motion_logits is None
+                or reference_relation.motion_logits is None
+            ):
+                raise RuntimeError("Joint motion field requires relevance logits")
+            attention_mr = manipulated_relation.attention.mean(dim=1)
+            attention_rm = reference_relation.attention.mean(dim=1).transpose(1, 2)
+            pair_log_compatibility = 0.5 * (
+                attention_mr.clamp_min(1e-8).log()
+                + attention_rm.clamp_min(1e-8).log()
+            )
+            joint_logits = (
+                manipulated_relation.motion_logits.unsqueeze(2)
+                + reference_relation.motion_logits.unsqueeze(1)
+                + self.motion_field_pair_weight * pair_log_compatibility
+            )
+            joint_relation = torch.softmax(
+                joint_logits.flatten(1) / self.motion_field_temperature,
+                dim=1,
+            ).reshape_as(joint_logits)
+            manipulated_field = joint_relation.sum(dim=2)
+            reference_field = joint_relation.sum(dim=1)
+            manipulated_relation.motion_field = manipulated_field
+            reference_relation.motion_field = reference_field
+            manipulated_relation.token = torch.sum(
+                manipulated_field.unsqueeze(-1) * manipulated_relation.points,
+                dim=1,
+            )
+            reference_relation.token = torch.sum(
+                reference_field.unsqueeze(-1) * reference_relation.points,
+                dim=1,
+            )
+            manipulated_summary = torch.sum(
+                manipulated_field.unsqueeze(-1) * manipulated_features,
+                dim=1,
+            )
+            reference_summary = torch.sum(
+                reference_field.unsqueeze(-1) * reference_features,
+                dim=1,
+            )
+            initial = self.initial_fusion(
+                torch.cat((manipulated_summary, reference_summary), dim=-1)
+            )
+        else:
+            initial = self.initial_fusion(
+                torch.cat((manipulated_global, reference_global), dim=-1)
+            )
         tokens = torch.stack(
             (initial, manipulated_relation.token, reference_relation.token), dim=1
         ) + self.type_embedding[None]
@@ -187,6 +242,7 @@ class BidirectionalSceneEncoder(nn.Module):
                 reference_motion_field=reference_relation.motion_field,
                 manipulated_motion_logits=manipulated_relation.motion_logits,
                 reference_motion_logits=reference_relation.motion_logits,
+                joint_motion_relation=joint_relation,
             )
         attention_mr = manipulated_relation.attention
         attention_rm = reference_relation.attention
@@ -198,6 +254,7 @@ class BidirectionalSceneEncoder(nn.Module):
             reference_motion_field=reference_relation.motion_field,
             manipulated_motion_logits=manipulated_relation.motion_logits,
             reference_motion_logits=reference_relation.motion_logits,
+            joint_motion_relation=joint_relation,
             attention_manipulated_to_reference=attention_mr,
             attention_reference_to_manipulated=attention_rm,
             reference_importance=reference_importance,

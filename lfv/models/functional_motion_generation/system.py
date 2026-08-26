@@ -23,6 +23,7 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         encoder_heads: int = 4,
         motion_field_mode: str = "none",
         motion_field_temperature: float = 1.0,
+        motion_field_pair_weight: float = 0.25,
         goal_layers: int = 4,
         trajectory_layers: int = 6,
         decoder_heads: int = 4,
@@ -57,6 +58,7 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             dropout=dropout,
             motion_field_mode=motion_field_mode,
             motion_field_temperature=motion_field_temperature,
+            motion_field_pair_weight=motion_field_pair_weight,
         )
         self.goal_diffuser = GoalPoseDiffuser(
             GoalPoseDecoder(

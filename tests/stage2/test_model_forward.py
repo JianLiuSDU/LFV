@@ -111,3 +111,32 @@ def test_joint_motion_loss_reaches_both_relevance_heads():
         ]
         assert all(gradient is not None for gradient in gradients)
         assert sum(float(gradient.abs().sum()) for gradient in gradients) > 0.0
+
+
+def test_joint_relation_field_receives_motion_loss_gradients():
+    batch = _batch()
+    model = ThreeTokenHierarchicalDiffusion(
+        dino_dim=16,
+        hidden_dim=32,
+        encoder_heads=4,
+        motion_field_mode="joint",
+        motion_field_temperature=0.25,
+        motion_field_pair_weight=0.25,
+        goal_layers=1,
+        trajectory_layers=1,
+        decoder_heads=4,
+        dropout=0.0,
+        num_train_timesteps=10,
+        goal_inference_steps=2,
+        trajectory_inference_steps=2,
+    )
+    model.normalizer.fit_tensors([batch["trajectory_pose9d"]])
+    encoding = model.encode(batch)
+    assert encoding.joint_motion_relation is not None
+    encoding.joint_motion_relation.retain_grad()
+    losses = model.goal_diffuser.compute_loss(
+        encoding.tokens, batch["goal_pose9d"], model.normalizer
+    )
+    losses["goal_total"].backward()
+    assert encoding.joint_motion_relation.grad is not None
+    assert float(encoding.joint_motion_relation.grad.abs().sum()) > 0.0

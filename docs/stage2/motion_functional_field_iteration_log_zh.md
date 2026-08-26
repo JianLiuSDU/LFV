@@ -44,7 +44,8 @@ split_manifest.json 0a2e09088b828c8bdebdbcd49214706166de212f45ac47075785f119bd56
 
 ## V1：Independent Explicit Motion Fields
 
-状态：代码和单元测试已完成；训练尚未开始。
+状态：代码、单元测试和32条样本overfit已完成；判定为结构性负向结果，不进入完整
+179条数据训练。
 
 V1 不改变两个 Diffusion Decoder，只替换两个 Directional Relation 的池化方式。对
 manipulated 查询方向：
@@ -91,6 +92,49 @@ Trajectory 联合损失到两个 relevance heads 的非零梯度，以及 checkp
 首次overfit训练在恢复checkpoint时发现旧EMA实现会直接采用checkpoint tensor的设备，
 从而可能让恢复后的CPU shadow与GPU模型冲突。V1.1将EMA状态显式转换到当前模型参数
 的device和dtype；该修改只修复断点续训，不改变模型前向或损失。
+
+V1 overfit运行至epoch 159，最终train/同集val total分别为0.07762/0.07921，证明
+新的加权聚合能够正常训练并高度拟合32条运动。但最终归一化场熵仍为
+0.99876/0.99875，平均peak mass约0.00501，而256点均匀分布为0.00391。episode 0与
+episode 12的RGB/3D可视化也显示以全物体缓慢梯度为主，而不是明确局部功能区域。
+
+因此V1的低任务损失不能视为Motion Functional Field成功。结论是：独立head与关系
+加权本身不足；原始global token和平均关系表示足以拟合任务，使模型没有动力形成明确
+重要性。V1被保留为必要负向消融。
+
+本地证据：
+
+```text
+/home/users1/ljian/lfv_runs/stage2/motion_functional_field/v1_overfit32
+```
+
+## V2：Joint Functional Relation Bottleneck
+
+状态：代码和单元测试已完成；训练尚未开始。
+
+V2继续只修改Encoder。两个方向的逐点logits与双向attention的互惠兼容性共同构造：
+
+\[
+L_{ij}=a_i+b_j+\lambda_p\frac{1}{2}
+\left(\log A_{m\rightarrow r,ij}+\log A_{r\rightarrow m,ji}\right),
+\]
+
+\[
+J_{ij}=\operatorname{Softmax}_{i,j}(L_{ij}/\tau).
+\]
+
+两个可视化场严格定义为联合关系分布的边缘：
+
+\[
+H_m(i)=\sum_jJ_{ij},\qquad H_r(j)=\sum_iJ_{ij}.
+\]
+
+两个方向relation tokens使用对应边缘场加权；原始未筛选global token被替换为两个
+field-weighted对象摘要的融合。因而三个Decoder context tokens全部依赖 \(J\)，不再
+保留与其同容量的直接旁路。Goal和A3b Trajectory网络完全不变。
+
+V2第一轮固定 `temperature=0.25`、`pair_weight=0.25`。温度只控制连续竞争强度，
+不会加入杯口、碗口、PCA、法向或其他人工任务特征。
 
 ## 后续进入完整训练的门槛
 

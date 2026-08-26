@@ -87,3 +87,58 @@ def test_motion_functional_fields_are_normalized_and_permutation_equivariant():
         atol=1e-6,
         rtol=1e-6,
     )
+
+
+def test_joint_motion_relation_defines_both_field_marginals():
+    torch.manual_seed(11)
+    encoder = BidirectionalSceneEncoder(
+        dino_dim=16,
+        hidden_dim=32,
+        dino_projected_dim=16,
+        xyz_projected_dim=16,
+        num_heads=4,
+        dropout=0.0,
+        motion_field_mode="joint",
+        motion_field_temperature=0.25,
+        motion_field_pair_weight=0.25,
+    ).eval()
+    manipulated_points = torch.randn(2, 18, 3)
+    manipulated_dino = torch.randn(2, 18, 16)
+    reference_points = torch.randn(2, 14, 3)
+    reference_dino = torch.randn(2, 14, 16)
+    first = encoder(
+        manipulated_points,
+        manipulated_dino,
+        reference_points,
+        reference_dino,
+    )
+    assert first.joint_motion_relation is not None
+    assert first.joint_motion_relation.shape == (2, 18, 14)
+    torch.testing.assert_close(
+        first.joint_motion_relation.flatten(1).sum(dim=1), torch.ones(2)
+    )
+    torch.testing.assert_close(
+        first.manipulated_motion_field,
+        first.joint_motion_relation.sum(dim=2),
+    )
+    torch.testing.assert_close(
+        first.reference_motion_field,
+        first.joint_motion_relation.sum(dim=1),
+    )
+
+    perm_m = torch.randperm(18)
+    perm_r = torch.randperm(14)
+    second = encoder(
+        manipulated_points[:, perm_m],
+        manipulated_dino[:, perm_m],
+        reference_points[:, perm_r],
+        reference_dino[:, perm_r],
+    )
+    torch.testing.assert_close(first.tokens, second.tokens, atol=1e-5, rtol=1e-5)
+    expected_joint = first.joint_motion_relation[:, perm_m][:, :, perm_r]
+    torch.testing.assert_close(
+        expected_joint,
+        second.joint_motion_relation,
+        atol=1e-6,
+        rtol=1e-6,
+    )
