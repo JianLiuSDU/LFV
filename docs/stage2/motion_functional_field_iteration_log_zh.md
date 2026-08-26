@@ -110,7 +110,7 @@ episode 12的RGB/3D可视化也显示以全物体缓慢梯度为主，而不是�
 
 ## V2：Joint Functional Relation Bottleneck
 
-状态：代码和单元测试已完成；训练尚未开始。
+状态：代码、单元测试、32条样本 overfit、179条样本固定划分训练、测试和因果消融均已完成。
 
 V2继续只修改Encoder。两个方向的逐点logits与双向attention的互惠兼容性共同构造：
 
@@ -136,6 +136,60 @@ field-weighted对象摘要的融合。因而三个Decoder context tokens全部�
 V2第一轮固定 `temperature=0.25`、`pair_weight=0.25`。温度只控制连续竞争强度，
 不会加入杯口、碗口、PCA、法向或其他人工任务特征。
 
+### V2 训练结果
+
+V2 overfit 运行至 epoch 159，最佳训练/同集验证 total 约为 0.07538/0.08108；
+归一化 manipulated/reference field 熵约为 0.876/0.900，peak mass 约为 0.0397/0.026，
+明显区别于 256 点均匀分布（peak=0.00391）。在固定的 143/18/18 episode 划分上，
+全量训练在 epoch 209 早停，最佳 checkpoint 为 epoch 129，验证 total=0.47085。
+
+CPU 固定测试（test=18 episodes，EMA 权重，K=4 goals、每个 goal 1 条 trajectory）为：
+
+| 指标 | V0 A3b | V2 Joint Field |
+|---|---:|---:|
+| Goal top-1 translation | 0.02874 m | 0.02925 m |
+| Goal top-1 rotation | 24.42 deg | 25.72 deg |
+| Trajectory top-1 translation | 0.04290 m | 0.04288 m |
+| Trajectory top-1 rotation | 14.00 deg | 14.04 deg |
+| Trajectory first-step translation error | — | 0.00267 m |
+
+因此，加入显式场瓶颈没有破坏原有轨迹任务性能；goal 旋转存在约 1 度量级的波动，
+需要在后续更高 K 的 GPU 评估中复核，不能据此宣称提升。
+
+### 因果性与可视化证据
+
+在同一测试协议中，把正常的 (H_m,H_r) 替换成均匀场，或在点维度循环打乱场，
+会改变三个 context tokens 并造成性能退化：
+
+| 场输入 | Goal top-1 translation | Trajectory top-1 translation | Trajectory rotation |
+|---|---:|---:|---:|
+| learned field | 0.02932 m | 0.04198 m | 13.77 deg |
+| uniform field | 0.03302 m | 0.04357 m | 14.34 deg |
+| rolled field | 0.03305 m | 0.04355 m | 14.36 deg |
+
+这说明运动场参与了预测，而不是仅作为事后 attention 可视化。需要保持证据边界：
+因果退化证明的是场的任务相关性，不等于已经证明场在所有实例上等价于真实的人类
+运动功能区域。
+
+固定可视化样本保存在：
+
+```text
+/home/users1/ljian/lfv_runs/stage2/motion_functional_field/v2_joint/fields_visuals/
+  train_episode_0.png
+  val_episode_15.png
+  test_episode_14.png
+```
+
+episode 0 的 manipulated 场在杯体局部形成明显峰值，reference 场集中于碗内/碗缘
+区域；val episode 15 仍能观察到杯体局部峰值。test episode 14 的场相对平坦，说明
+仅靠无额外场监督的任务损失，场的跨 episode 稳定性仍有限；该样本也被保留作为诚实的
+失败/不确定性证据，而不是挑选性展示。
+
+频谱评估（test=18，GT goal）为 position low-energy retention=0.887、mid=0.339、
+high=0.195；velocity low/mid/high retention=0.799/0.245/0.151。与 V0 的低/中频
+指标同量级，V2 当前主要解决“场是否参与运动预测”，尚未解决轨迹高频细节被过度平滑
+的问题。
+
 ## 后续进入完整训练的门槛
 
 1. 32条训练样本 overfit 时 task loss 明显下降；
@@ -145,3 +199,13 @@ V2第一轮固定 `temperature=0.25`、`pair_weight=0.25`。温度只控制连�
 5. 完整训练后低频和中频指标不能用无相位伪高频替代；
 6. 如果V1不能形成稳定功能区域，保留该负向结果并进入V2，而不是通过人工杯口特征
    强迫得到漂亮热力图。
+
+V2 已通过前四项并完成固定测试。下一轮若要提高场的跨 episode 稳定性，应优先考虑
+训练内的轻量一致性或数据增强，并保持同一 encoder/decoder 接口；不得直接加入手工
+杯口检测、PCA 或后处理热力图来替代网络学习。当前版本的可复现实验入口是：
+
+```text
+branch: stage2/motion-functional-field
+tag:    stage2-motion-field-v2.1-causal-eval
+best:   /home/users1/ljian/lfv_runs/stage2/motion_functional_field/v2_joint/checkpoints/best.pt
+```
