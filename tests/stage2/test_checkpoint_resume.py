@@ -74,3 +74,15 @@ def test_checkpoint_roundtrip(tmp_path):
     )
     torch.testing.assert_close(expected.goals, reproduced.goals)
     torch.testing.assert_close(expected.trajectories, reproduced.trajectories)
+
+
+def test_ema_resume_matches_current_model_dtype():
+    source = torch.nn.Linear(4, 3).float()
+    target = torch.nn.Linear(4, 3).double()
+    source_ema = ExponentialMovingAverage(source)
+    target_ema = ExponentialMovingAverage(target)
+    target_ema.load_state_dict(source_ema.state_dict())
+    target_parameters = dict(target.named_parameters())
+    for key, shadow in target_ema.shadow.items():
+        assert shadow.dtype == target_parameters[key].dtype
+        assert shadow.device == target_parameters[key].device

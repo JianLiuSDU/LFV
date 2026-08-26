@@ -88,6 +88,10 @@ reference_motion_logits   [B,Nr]
 Trajectory 联合损失到两个 relevance heads 的非零梯度，以及 checkpoint 恢复与采样
 复现。
 
+首次overfit训练在恢复checkpoint时发现旧EMA实现会直接采用checkpoint tensor的设备，
+从而可能让恢复后的CPU shadow与GPU模型冲突。V1.1将EMA状态显式转换到当前模型参数
+的device和dtype；该修改只修复断点续训，不改变模型前向或损失。
+
 ## 后续进入完整训练的门槛
 
 1. 32条训练样本 overfit 时 task loss 明显下降；
