@@ -11,6 +11,26 @@ from ..interfaces import ContextEncoding
 from .pointnet import PointNetBranch
 
 
+def _intervene_distribution(
+    distribution: torch.Tensor,
+    intervention: str | None,
+) -> torch.Tensor:
+    if intervention is None:
+        return distribution
+    if intervention == "uniform":
+        return torch.full_like(distribution, 1.0 / distribution[0].numel())
+    if intervention == "roll":
+        output = distribution
+        for dimension in range(1, distribution.ndim):
+            output = torch.roll(
+                output,
+                shifts=distribution.shape[dimension] // 2,
+                dims=dimension,
+            )
+        return output
+    raise ValueError("motion_field_intervention must be None, 'uniform', or 'roll'")
+
+
 @dataclass
 class DirectionalRelationEncoding:
     token: torch.Tensor
@@ -164,6 +184,7 @@ class BidirectionalSceneEncoder(nn.Module):
         reference_dino: torch.Tensor,
         *,
         return_debug: bool = False,
+        motion_field_intervention: str | None = None,
     ) -> ContextEncoding:
         manipulated_input = torch.cat(
             (self.manipulated_xyz(manipulated_points), self.dino_projector(manipulated_dino)),
@@ -205,6 +226,9 @@ class BidirectionalSceneEncoder(nn.Module):
                 joint_logits.flatten(1) / self.motion_field_temperature,
                 dim=1,
             ).reshape_as(joint_logits)
+            joint_relation = _intervene_distribution(
+                joint_relation, motion_field_intervention
+            )
             manipulated_field = joint_relation.sum(dim=2)
             reference_field = joint_relation.sum(dim=1)
             manipulated_relation.motion_field = manipulated_field
@@ -229,6 +253,26 @@ class BidirectionalSceneEncoder(nn.Module):
                 torch.cat((manipulated_summary, reference_summary), dim=-1)
             )
         else:
+            if (
+                self.motion_field_mode == "independent"
+                and motion_field_intervention is not None
+            ):
+                manipulated_relation.motion_field = _intervene_distribution(
+                    manipulated_relation.motion_field, motion_field_intervention
+                )
+                reference_relation.motion_field = _intervene_distribution(
+                    reference_relation.motion_field, motion_field_intervention
+                )
+                manipulated_relation.token = torch.sum(
+                    manipulated_relation.motion_field.unsqueeze(-1)
+                    * manipulated_relation.points,
+                    dim=1,
+                )
+                reference_relation.token = torch.sum(
+                    reference_relation.motion_field.unsqueeze(-1)
+                    * reference_relation.points,
+                    dim=1,
+                )
             initial = self.initial_fusion(
                 torch.cat((manipulated_global, reference_global), dim=-1)
             )

@@ -98,13 +98,20 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         )
         self.normalizer = Pose9DNormalizer()
 
-    def encode(self, batch: dict, *, return_debug: bool = False) -> ContextEncoding:
+    def encode(
+        self,
+        batch: dict,
+        *,
+        return_debug: bool = False,
+        motion_field_intervention: str | None = None,
+    ) -> ContextEncoding:
         return self.encoder(
             batch["manipulated_points"],
             batch["manipulated_dino"],
             batch["reference_points"],
             batch["reference_dino"],
             return_debug=return_debug,
+            motion_field_intervention=motion_field_intervention,
         )
 
     def compute_loss(self, batch: dict, stage: str = "joint") -> dict[str, torch.Tensor]:
@@ -171,8 +178,13 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         return_debug: bool = False,
         goal_inference_steps: int | None = None,
         trajectory_inference_steps: int | None = None,
+        motion_field_intervention: str | None = None,
     ) -> tuple[Stage2Samples, ContextEncoding]:
-        encoding = self.encode(batch, return_debug=return_debug)
+        encoding = self.encode(
+            batch,
+            return_debug=return_debug,
+            motion_field_intervention=motion_field_intervention,
+        )
         goals = self.goal_diffuser.sample(
             encoding.tokens,
             self.normalizer,

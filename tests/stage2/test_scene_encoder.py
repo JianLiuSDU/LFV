@@ -142,3 +142,34 @@ def test_joint_motion_relation_defines_both_field_marginals():
         atol=1e-6,
         rtol=1e-6,
     )
+
+
+def test_joint_field_interventions_change_tokens_and_preserve_probability_mass():
+    torch.manual_seed(19)
+    encoder = BidirectionalSceneEncoder(
+        dino_dim=16,
+        hidden_dim=32,
+        dino_projected_dim=16,
+        xyz_projected_dim=16,
+        num_heads=4,
+        dropout=0.0,
+        motion_field_mode="joint",
+        motion_field_temperature=0.25,
+    ).eval()
+    inputs = (
+        torch.randn(2, 18, 3),
+        torch.randn(2, 18, 16),
+        torch.randn(2, 14, 3),
+        torch.randn(2, 14, 16),
+    )
+    normal = encoder(*inputs)
+    uniform = encoder(*inputs, motion_field_intervention="uniform")
+    rolled = encoder(*inputs, motion_field_intervention="roll")
+    torch.testing.assert_close(
+        uniform.joint_motion_relation.flatten(1).sum(1), torch.ones(2)
+    )
+    torch.testing.assert_close(
+        rolled.joint_motion_relation.flatten(1).sum(1), torch.ones(2)
+    )
+    assert not torch.allclose(normal.tokens, uniform.tokens)
+    assert not torch.allclose(normal.tokens, rolled.tokens)
