@@ -23,8 +23,10 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         encoder_heads: int = 4,
         motion_field_mode: str = "none",
         motion_field_temperature: float = 1.0,
+        motion_field_normalization: str = "softmax",
         motion_field_pair_weight: float = 0.25,
         goal_relation_conditioning: bool = False,
+        goal_relation_gate_init: float = 0.1,
         goal_candidate_scoring: bool = False,
         goal_score_weight: float = 0.1,
         goal_layers: int = 4,
@@ -61,8 +63,10 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             dropout=dropout,
             motion_field_mode=motion_field_mode,
             motion_field_temperature=motion_field_temperature,
+            motion_field_normalization=motion_field_normalization,
             motion_field_pair_weight=motion_field_pair_weight,
             goal_relation_conditioning=goal_relation_conditioning,
+            goal_relation_gate_init=goal_relation_gate_init,
         )
         self.goal_diffuser = GoalPoseDiffuser(
             GoalPoseDecoder(

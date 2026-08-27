@@ -21,11 +21,17 @@ def model_kwargs(config: dict, dino_dim: int) -> dict:
         "motion_field_temperature": float(
             model.get("motion_field_temperature", 1.0)
         ),
+        "motion_field_normalization": str(
+            model.get("motion_field_normalization", "softmax")
+        ),
         "motion_field_pair_weight": float(
             model.get("motion_field_pair_weight", 0.25)
         ),
         "goal_relation_conditioning": bool(
             model.get("goal_relation_conditioning", False)
+        ),
+        "goal_relation_gate_init": float(
+            model.get("goal_relation_gate_init", 0.1)
         ),
         "goal_candidate_scoring": bool(
             model.get("goal_candidate_scoring", False)

@@ -115,6 +115,27 @@ def test_goal_functional_anchor_and_candidate_scoring():
     assert torch.isfinite(samples.goal_scores).all()
 
 
+def test_sparsemax_motion_field_is_a_simplex_and_sparse():
+    batch = _batch(count=1)
+    model = ThreeTokenHierarchicalDiffusion(
+        dino_dim=16,
+        hidden_dim=32,
+        encoder_heads=4,
+        motion_field_mode="joint",
+        motion_field_normalization="sparsemax",
+        goal_layers=1,
+        trajectory_layers=1,
+        decoder_heads=4,
+        dropout=0.0,
+        num_train_timesteps=10,
+    )
+    encoding = model.encode(batch)
+    assert encoding.manipulated_motion_field is not None
+    field = encoding.manipulated_motion_field
+    torch.testing.assert_close(field.sum(dim=1), torch.ones(1))
+    assert (field == 0).any()
+
+
 def test_joint_motion_loss_reaches_both_relevance_heads():
     batch = _batch()
     model = ThreeTokenHierarchicalDiffusion(
