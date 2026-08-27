@@ -140,3 +140,66 @@ def test_joint_relation_field_receives_motion_loss_gradients():
     losses["goal_total"].backward()
     assert encoding.joint_motion_relation.grad is not None
     assert float(encoding.joint_motion_relation.grad.abs().sum()) > 0.0
+
+
+def test_goal_only_field_detaches_relevance_from_trajectory_loss():
+    batch = _batch()
+    model = ThreeTokenHierarchicalDiffusion(
+        dino_dim=16,
+        hidden_dim=32,
+        encoder_heads=4,
+        motion_field_mode="joint",
+        motion_field_gradient_mode="goal_only",
+        motion_field_temperature=0.25,
+        goal_layers=1,
+        trajectory_layers=1,
+        decoder_heads=4,
+        dropout=0.0,
+        num_train_timesteps=10,
+    )
+    model.normalizer.fit_tensors([batch["trajectory_pose9d"]])
+    encoding = model.encode(batch, detach_motion_field=True)
+    assert encoding.tokens_motion_field_detached is not None
+    torch.testing.assert_close(
+        encoding.tokens,
+        encoding.tokens_motion_field_detached,
+        atol=1e-6,
+        rtol=1e-6,
+    )
+    trajectory_losses = model.trajectory_diffuser.compute_loss(
+        encoding.tokens_motion_field_detached,
+        batch["goal_pose9d"],
+        batch["trajectory_pose9d"],
+        model.normalizer,
+    )
+    trajectory_losses["trajectory_total"].backward()
+    for relation in (
+        model.encoder.manipulated_queries_reference,
+        model.encoder.reference_queries_manipulated,
+    ):
+        assert relation.relevance_head is not None
+        gradients = [
+            parameter.grad
+            for parameter in relation.relevance_head.parameters()
+            if parameter.requires_grad
+        ]
+        assert all(gradient is None for gradient in gradients)
+
+    model.zero_grad(set_to_none=True)
+    goal_encoding = model.encode(batch, detach_motion_field=True)
+    goal_losses = model.goal_diffuser.compute_loss(
+        goal_encoding.tokens, batch["goal_pose9d"], model.normalizer
+    )
+    goal_losses["goal_total"].backward()
+    for relation in (
+        model.encoder.manipulated_queries_reference,
+        model.encoder.reference_queries_manipulated,
+    ):
+        assert relation.relevance_head is not None
+        gradients = [
+            parameter.grad
+            for parameter in relation.relevance_head.parameters()
+            if parameter.requires_grad
+        ]
+        assert all(gradient is not None for gradient in gradients)
+        assert sum(float(gradient.abs().sum()) for gradient in gradients) > 0.0

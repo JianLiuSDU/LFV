@@ -24,6 +24,7 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         motion_field_mode: str = "none",
         motion_field_temperature: float = 1.0,
         motion_field_pair_weight: float = 0.25,
+        motion_field_gradient_mode: str = "joint",
         goal_layers: int = 4,
         trajectory_layers: int = 6,
         decoder_heads: int = 4,
@@ -49,6 +50,11 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         trajectory_acceleration_weight: float = 0.0,
     ) -> None:
         super().__init__()
+        if motion_field_gradient_mode not in {"joint", "goal_only"}:
+            raise ValueError(
+                "motion_field_gradient_mode must be 'joint' or 'goal_only'"
+            )
+        self.motion_field_gradient_mode = motion_field_gradient_mode
         self.encoder = BidirectionalSceneEncoder(
             dino_dim=dino_dim,
             hidden_dim=hidden_dim,
@@ -104,6 +110,7 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         *,
         return_debug: bool = False,
         motion_field_intervention: str | None = None,
+        detach_motion_field: bool = False,
     ) -> ContextEncoding:
         return self.encoder(
             batch["manipulated_points"],
@@ -112,10 +119,14 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             batch["reference_dino"],
             return_debug=return_debug,
             motion_field_intervention=motion_field_intervention,
+            detach_motion_field=detach_motion_field,
         )
 
     def compute_loss(self, batch: dict, stage: str = "joint") -> dict[str, torch.Tensor]:
-        encoding = self.encode(batch)
+        encoding = self.encode(
+            batch,
+            detach_motion_field=self.motion_field_gradient_mode == "goal_only",
+        )
         context = encoding.tokens
         losses: dict[str, torch.Tensor] = {}
         if stage in ("goal", "joint"):
@@ -125,9 +136,15 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
                 )
             )
         if stage in ("trajectory", "joint"):
+            trajectory_context = (
+                encoding.tokens_motion_field_detached
+                if self.motion_field_gradient_mode == "goal_only"
+                and encoding.tokens_motion_field_detached is not None
+                else context
+            )
             losses.update(
                 self.trajectory_diffuser.compute_loss(
-                    context,
+                    trajectory_context,
                     batch["goal_pose9d"],
                     batch["trajectory_pose9d"],
                     self.normalizer,
