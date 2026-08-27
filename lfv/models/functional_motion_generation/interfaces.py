@@ -10,11 +10,6 @@ import torch
 @dataclass
 class ContextEncoding:
     tokens: torch.Tensor
-    # Numerically identical context tokens whose relevance-field weights are
-    # detached.  This is used only for the Goal-only Motion Field ablation:
-    # trajectory supervision still trains the point/relation features, but it
-    # cannot update the relevance distribution itself.
-    tokens_motion_field_detached: torch.Tensor | None = None
     manipulated_motion_field: torch.Tensor | None = None
     reference_motion_field: torch.Tensor | None = None
     manipulated_motion_logits: torch.Tensor | None = None

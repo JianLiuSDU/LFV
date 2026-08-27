@@ -185,7 +185,6 @@ class BidirectionalSceneEncoder(nn.Module):
         *,
         return_debug: bool = False,
         motion_field_intervention: str | None = None,
-        detach_motion_field: bool = False,
     ) -> ContextEncoding:
         manipulated_input = torch.cat(
             (self.manipulated_xyz(manipulated_points), self.dino_projector(manipulated_dino)),
@@ -206,7 +205,6 @@ class BidirectionalSceneEncoder(nn.Module):
             reference_features, manipulated_features
         )
         joint_relation = None
-        detached_tokens = None
         if self.motion_field_mode == "joint":
             if (
                 manipulated_relation.motion_logits is None
@@ -235,64 +233,25 @@ class BidirectionalSceneEncoder(nn.Module):
             reference_field = joint_relation.sum(dim=1)
             manipulated_relation.motion_field = manipulated_field
             reference_relation.motion_field = reference_field
-            def _pool(
-                field: torch.Tensor,
-                values: torch.Tensor,
-                *,
-                detach_field: bool = False,
-            ) -> torch.Tensor:
-                field_for_pool = field.detach() if detach_field else field
-                return torch.sum(field_for_pool.unsqueeze(-1) * values, dim=1)
-
-            manipulated_relation.token = _pool(
-                manipulated_field, manipulated_relation.points
+            manipulated_relation.token = torch.sum(
+                manipulated_field.unsqueeze(-1) * manipulated_relation.points,
+                dim=1,
             )
-            reference_relation.token = _pool(
-                reference_field, reference_relation.points
+            reference_relation.token = torch.sum(
+                reference_field.unsqueeze(-1) * reference_relation.points,
+                dim=1,
             )
-            manipulated_summary = _pool(
-                manipulated_field, manipulated_features
+            manipulated_summary = torch.sum(
+                manipulated_field.unsqueeze(-1) * manipulated_features,
+                dim=1,
             )
-            reference_summary = _pool(reference_field, reference_features)
+            reference_summary = torch.sum(
+                reference_field.unsqueeze(-1) * reference_features,
+                dim=1,
+            )
             initial = self.initial_fusion(
                 torch.cat((manipulated_summary, reference_summary), dim=-1)
             )
-            if detach_motion_field:
-                detached_manipulated_token = _pool(
-                    manipulated_field,
-                    manipulated_relation.points,
-                    detach_field=True,
-                )
-                detached_reference_token = _pool(
-                    reference_field,
-                    reference_relation.points,
-                    detach_field=True,
-                )
-                detached_initial = self.initial_fusion(
-                    torch.cat(
-                        (
-                            _pool(
-                                manipulated_field,
-                                manipulated_features,
-                                detach_field=True,
-                            ),
-                            _pool(
-                                reference_field,
-                                reference_features,
-                                detach_field=True,
-                            ),
-                        ),
-                        dim=-1,
-                    )
-                )
-                detached_tokens = torch.stack(
-                    (
-                        detached_initial,
-                        detached_manipulated_token,
-                        detached_reference_token,
-                    ),
-                    dim=1,
-                ) + self.type_embedding[None]
         else:
             if (
                 self.motion_field_mode == "independent"
@@ -317,39 +276,12 @@ class BidirectionalSceneEncoder(nn.Module):
             initial = self.initial_fusion(
                 torch.cat((manipulated_global, reference_global), dim=-1)
             )
-            if detach_motion_field and self.motion_field_mode == "independent":
-                if (
-                    manipulated_relation.motion_field is None
-                    or reference_relation.motion_field is None
-                ):
-                    raise RuntimeError(
-                        "Detached motion-field tokens require independent fields"
-                    )
-                detached_manipulated_token = torch.sum(
-                    manipulated_relation.motion_field.detach().unsqueeze(-1)
-                    * manipulated_relation.points,
-                    dim=1,
-                )
-                detached_reference_token = torch.sum(
-                    reference_relation.motion_field.detach().unsqueeze(-1)
-                    * reference_relation.points,
-                    dim=1,
-                )
-                detached_tokens = torch.stack(
-                    (
-                        initial,
-                        detached_manipulated_token,
-                        detached_reference_token,
-                    ),
-                    dim=1,
-                ) + self.type_embedding[None]
         tokens = torch.stack(
             (initial, manipulated_relation.token, reference_relation.token), dim=1
         ) + self.type_embedding[None]
         if not return_debug:
             return ContextEncoding(
                 tokens=tokens,
-                tokens_motion_field_detached=detached_tokens,
                 manipulated_motion_field=manipulated_relation.motion_field,
                 reference_motion_field=reference_relation.motion_field,
                 manipulated_motion_logits=manipulated_relation.motion_logits,
@@ -362,7 +294,6 @@ class BidirectionalSceneEncoder(nn.Module):
         manipulated_importance = attention_rm.mean(dim=(1, 2))
         return ContextEncoding(
             tokens=tokens,
-            tokens_motion_field_detached=detached_tokens,
             manipulated_motion_field=manipulated_relation.motion_field,
             reference_motion_field=reference_relation.motion_field,
             manipulated_motion_logits=manipulated_relation.motion_logits,
