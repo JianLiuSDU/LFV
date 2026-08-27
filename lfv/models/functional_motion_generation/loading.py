@@ -24,6 +24,13 @@ def model_kwargs(config: dict, dino_dim: int) -> dict:
         "motion_field_pair_weight": float(
             model.get("motion_field_pair_weight", 0.25)
         ),
+        "goal_relation_conditioning": bool(
+            model.get("goal_relation_conditioning", False)
+        ),
+        "goal_candidate_scoring": bool(
+            model.get("goal_candidate_scoring", False)
+        ),
+        "goal_score_weight": float(model.get("goal_score_weight", 0.1)),
         "goal_layers": int(model.get("goal_layers", 4)),
         "trajectory_layers": int(model.get("trajectory_layers", 6)),
         "decoder_heads": int(model.get("decoder_heads", 4)),

@@ -131,6 +131,7 @@ class BidirectionalSceneEncoder(nn.Module):
         motion_field_mode: str = "none",
         motion_field_temperature: float = 1.0,
         motion_field_pair_weight: float = 0.25,
+        goal_relation_conditioning: bool = False,
     ) -> None:
         super().__init__()
         if dino_projected_dim + xyz_projected_dim != hidden_dim:
@@ -140,6 +141,7 @@ class BidirectionalSceneEncoder(nn.Module):
         self.motion_field_mode = motion_field_mode
         self.motion_field_temperature = float(motion_field_temperature)
         self.motion_field_pair_weight = float(motion_field_pair_weight)
+        self.goal_relation_conditioning = bool(goal_relation_conditioning)
         self.dino_projector = nn.Sequential(
             nn.LayerNorm(dino_dim),
             nn.Linear(dino_dim, 256),
@@ -175,6 +177,26 @@ class BidirectionalSceneEncoder(nn.Module):
             motion_field_temperature=motion_field_temperature,
         )
         self.type_embedding = nn.Parameter(torch.randn(3, hidden_dim) * 0.02)
+        if self.goal_relation_conditioning:
+            # The anchor is a differentiable moment of the learned field, not
+            # a hand-coded centroid or an OBB.  Separate role projections keep
+            # the object roles identifiable while sharing the same geometry.
+            self.manipulated_anchor_encoder = nn.Sequential(
+                nn.Linear(hidden_dim + 3, hidden_dim),
+                nn.GELU(),
+                nn.LayerNorm(hidden_dim),
+            )
+            self.reference_anchor_encoder = nn.Sequential(
+                nn.Linear(hidden_dim + 3, hidden_dim),
+                nn.GELU(),
+                nn.LayerNorm(hidden_dim),
+            )
+            self.goal_relation_encoder = nn.Sequential(
+                nn.Linear(hidden_dim * 2 + 3, hidden_dim),
+                nn.GELU(),
+                nn.Linear(hidden_dim, hidden_dim),
+                nn.LayerNorm(hidden_dim),
+            )
 
     def forward(
         self,
@@ -279,9 +301,56 @@ class BidirectionalSceneEncoder(nn.Module):
         tokens = torch.stack(
             (initial, manipulated_relation.token, reference_relation.token), dim=1
         ) + self.type_embedding[None]
+        goal_relation_tokens = None
+        manipulated_anchor_xyz = None
+        reference_anchor_xyz = None
+        if self.goal_relation_conditioning:
+            # A missing field (e.g. a legacy ``motion_field_mode=none`` model)
+            # falls back to a uniform distribution.  This keeps the optional
+            # conditioning well-defined without introducing a hard-coded point.
+            if manipulated_relation.motion_field is None:
+                manipulated_weights = torch.full(
+                    manipulated_points.shape[:2],
+                    1.0 / manipulated_points.shape[1],
+                    device=manipulated_points.device,
+                    dtype=manipulated_points.dtype,
+                )
+            else:
+                manipulated_weights = manipulated_relation.motion_field
+            if reference_relation.motion_field is None:
+                reference_weights = torch.full(
+                    reference_points.shape[:2],
+                    1.0 / reference_points.shape[1],
+                    device=reference_points.device,
+                    dtype=reference_points.dtype,
+                )
+            else:
+                reference_weights = reference_relation.motion_field
+            manipulated_anchor_xyz = torch.sum(
+                manipulated_weights.unsqueeze(-1) * manipulated_points, dim=1
+            )
+            reference_anchor_xyz = torch.sum(
+                reference_weights.unsqueeze(-1) * reference_points, dim=1
+            )
+            manipulated_anchor = self.manipulated_anchor_encoder(
+                torch.cat((manipulated_relation.token, manipulated_anchor_xyz), dim=-1)
+            )
+            reference_anchor = self.reference_anchor_encoder(
+                torch.cat((reference_relation.token, reference_anchor_xyz), dim=-1)
+            )
+            relative_xyz = reference_anchor_xyz - manipulated_anchor_xyz
+            relation_anchor = self.goal_relation_encoder(
+                torch.cat((manipulated_anchor, reference_anchor, relative_xyz), dim=-1)
+            )
+            goal_relation_tokens = torch.stack(
+                (manipulated_anchor, reference_anchor, relation_anchor), dim=1
+            )
         if not return_debug:
             return ContextEncoding(
                 tokens=tokens,
+                goal_relation_tokens=goal_relation_tokens,
+                manipulated_anchor_xyz=manipulated_anchor_xyz,
+                reference_anchor_xyz=reference_anchor_xyz,
                 manipulated_motion_field=manipulated_relation.motion_field,
                 reference_motion_field=reference_relation.motion_field,
                 manipulated_motion_logits=manipulated_relation.motion_logits,
@@ -294,6 +363,9 @@ class BidirectionalSceneEncoder(nn.Module):
         manipulated_importance = attention_rm.mean(dim=(1, 2))
         return ContextEncoding(
             tokens=tokens,
+            goal_relation_tokens=goal_relation_tokens,
+            manipulated_anchor_xyz=manipulated_anchor_xyz,
+            reference_anchor_xyz=reference_anchor_xyz,
             manipulated_motion_field=manipulated_relation.motion_field,
             reference_motion_field=reference_relation.motion_field,
             manipulated_motion_logits=manipulated_relation.motion_logits,

@@ -24,6 +24,9 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         motion_field_mode: str = "none",
         motion_field_temperature: float = 1.0,
         motion_field_pair_weight: float = 0.25,
+        goal_relation_conditioning: bool = False,
+        goal_candidate_scoring: bool = False,
+        goal_score_weight: float = 0.1,
         goal_layers: int = 4,
         trajectory_layers: int = 6,
         decoder_heads: int = 4,
@@ -59,6 +62,7 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             motion_field_mode=motion_field_mode,
             motion_field_temperature=motion_field_temperature,
             motion_field_pair_weight=motion_field_pair_weight,
+            goal_relation_conditioning=goal_relation_conditioning,
         )
         self.goal_diffuser = GoalPoseDiffuser(
             GoalPoseDecoder(
@@ -69,7 +73,11 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             ),
             num_train_timesteps=num_train_timesteps,
             inference_steps=goal_inference_steps,
+            candidate_scoring=goal_candidate_scoring,
+            score_weight=goal_score_weight,
         )
+        if goal_candidate_scoring:
+            self.goal_diffuser.set_context_dim(hidden_dim)
         self.trajectory_diffuser = TrajectoryDiffuser(
             TrajectoryDecoder(
                 hidden_dim=hidden_dim,
@@ -121,7 +129,10 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         if stage in ("goal", "joint"):
             losses.update(
                 self.goal_diffuser.compute_loss(
-                    context, batch["goal_pose9d"], self.normalizer
+                    context,
+                    batch["goal_pose9d"],
+                    self.normalizer,
+                    goal_relation_tokens=encoding.goal_relation_tokens,
                 )
             )
         if stage in ("trajectory", "joint"):
@@ -191,7 +202,21 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             num_samples=num_goal_samples,
             generator=generator,
             inference_steps=goal_inference_steps,
+            goal_relation_tokens=encoding.goal_relation_tokens,
         )
+        goal_scores = self.goal_diffuser.score_candidates(
+            goals,
+            encoding.tokens,
+            self.normalizer,
+            encoding.goal_relation_tokens,
+        )
+        if goal_scores is not None:
+            order = goal_scores.argsort(dim=1, descending=True)
+            goals = torch.gather(
+                goals,
+                1,
+                order[..., None].expand(-1, -1, goals.shape[-1]),
+            )
         trajectories = self.trajectory_diffuser.sample(
             encoding.tokens,
             goals,
@@ -205,4 +230,6 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         )[None, :, None].expand(
             goals.shape[0], num_goal_samples, num_trajectory_samples
         )
-        return Stage2Samples(goals, trajectories, goal_ids), encoding
+        if goal_scores is not None:
+            goal_scores = torch.gather(goal_scores, 1, order)
+        return Stage2Samples(goals, trajectories, goal_ids, goal_scores), encoding
