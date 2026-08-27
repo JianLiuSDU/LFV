@@ -117,7 +117,15 @@ def load_stage2_checkpoint(
     model = build_model(
         config["model"]["name"], **model_kwargs(config, dino_dim)
     )
-    model.load_state_dict(payload["model"])
+    missing, unexpected = model.load_state_dict(payload["model"], strict=False)
+    optional_missing = {
+        "encoder.goal_relation_gate",
+    }
+    if unexpected or any(key not in optional_missing for key in missing):
+        raise RuntimeError(
+            "Checkpoint/model mismatch: "
+            f"missing={list(missing)}, unexpected={list(unexpected)}"
+        )
     if use_ema:
         state = dict(model.named_parameters())
         with torch.no_grad():

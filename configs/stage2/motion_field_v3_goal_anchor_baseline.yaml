@@ -6,8 +6,7 @@ model:
   motion_field_temperature: 0.25
   motion_field_pair_weight: 0.25
   goal_relation_conditioning: true
-  goal_candidate_scoring: true
-  goal_score_weight: 0.05
+  goal_candidate_scoring: false
   goal_layers: 4
   trajectory_layers: 6
   decoder_heads: 4
@@ -55,8 +54,8 @@ training:
   stage: joint
   batch_size: 16
   num_workers: 0
-  epochs: 100
-  early_stopping_patience: 30
+  epochs: 150
+  early_stopping_patience: 40
 
 paths:
-  output_dir: /home/users1/ljian/lfv_runs/stage2/goal_anchor_score_v1
+  output_dir: /home/users1/ljian/lfv_runs/stage2/goal_anchor_baseline_v1
