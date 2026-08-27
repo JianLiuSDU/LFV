@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Visualize Stage 2 top-1 inference beside GT on cached train episodes."""
+"""Visualize Stage 2 top-1 inference beside GT on a cached split."""
 
 from __future__ import annotations
 
@@ -186,8 +186,13 @@ def main() -> int:
     parser.add_argument("--cache-root", required=True)
     parser.add_argument("--source-root", default="/media/ljian/lj/data_3d/pouring_lfv")
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--split", choices=("train", "val", "test"), default="train")
+    parser.add_argument("--episodes", nargs="+", default=None)
     parser.add_argument(
-        "--episodes", nargs="+", default=["episode_152", "episode_90", "episode_33", "episode_12"]
+        "--max-episodes",
+        type=int,
+        default=None,
+        help="Optionally limit the number of episodes selected from the split.",
     )
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--seed", type=int, default=42)
@@ -202,17 +207,25 @@ def main() -> int:
     cache_root = Path(args.cache_root).expanduser().resolve()
     source_root = Path(args.source_root).expanduser().resolve()
     split = json.loads((cache_root / "split_manifest.json").read_text(encoding="utf-8"))
-    train_ids = set(split["episodes"]["train"])
-    unknown = sorted(set(args.episodes) - train_ids)
+    split_ids = list(split["episodes"][args.split])
+    episodes = list(args.episodes) if args.episodes is not None else split_ids
+    if args.max_episodes is not None:
+        if args.max_episodes <= 0:
+            raise ValueError("--max-episodes must be positive")
+        episodes = episodes[: args.max_episodes]
+    allowed_ids = set(split_ids)
+    unknown = sorted(set(episodes) - allowed_ids)
     if unknown:
-        raise ValueError(f"Requested episodes are not in train split: {unknown}")
+        raise ValueError(f"Requested episodes are not in {args.split} split: {unknown}")
+    if not episodes:
+        raise ValueError(f"No episodes selected from {args.split} split")
 
     device = torch.device(args.device)
     model, _, payload = load_stage2_checkpoint(
         args.checkpoint, device=device, use_ema=args.use_ema
     )
     rows, goal_rows, report_rows = [], [], []
-    for row_index, episode_id in enumerate(args.episodes):
+    for row_index, episode_id in enumerate(episodes):
         with np.load(cache_root / "episodes" / f"{episode_id}.npz") as data:
             manipulated_points = data["manipulated_points"].astype(np.float32)
             manipulated_dino = data["manipulated_dino"].astype(np.float32)
@@ -267,7 +280,7 @@ def main() -> int:
         top1_metrics = _pose_errors(top1, gt)
         input_panel = _panel_header(
             _draw_points(rgb, manipulated_pixels, reference_pixels),
-            f"{episode_id} | train input",
+            f"{episode_id} | {args.split} input",
             "yellow manipulated | magenta reference",
         )
         gt_panel = _draw_axes(
@@ -301,7 +314,7 @@ def main() -> int:
         )
         row = np.concatenate((input_panel, gt_panel, pred_panel), axis=1)
         rows.append(row)
-        cv2.imwrite(str(output / f"{episode_id}_gt_vs_top1.png"), row)
+        cv2.imwrite(str(output / f"{args.split}_{episode_id}_gt_vs_top1.png"), row)
 
         gt_goal_panel = _draw_axes(
             rgb,
@@ -332,7 +345,7 @@ def main() -> int:
         )
         goal_row = np.concatenate((input_panel, gt_goal_panel, predicted_goal_panel), axis=1)
         goal_rows.append(goal_row)
-        cv2.imwrite(str(output / f"{episode_id}_goal_gt_vs_top1.png"), goal_row)
+        cv2.imwrite(str(output / f"{args.split}_{episode_id}_goal_gt_vs_top1.png"), goal_row)
         report_rows.append(
             {
                 "episode_id": episode_id,
@@ -350,16 +363,16 @@ def main() -> int:
         )
 
     summary = np.concatenate(rows, axis=0)
-    summary_path = output / "train_inference_gt_vs_top1_summary.png"
+    summary_path = output / f"{args.split}_inference_gt_vs_top1_summary.png"
     cv2.imwrite(str(summary_path), summary)
     goal_summary = np.concatenate(goal_rows, axis=0)
-    goal_summary_path = output / "train_goal_pose_gt_vs_top1_summary.png"
+    goal_summary_path = output / f"{args.split}_goal_pose_gt_vs_top1_summary.png"
     cv2.imwrite(str(goal_summary_path), goal_summary)
     report = {
         "checkpoint": str(Path(args.checkpoint).expanduser().resolve()),
         "checkpoint_epoch": int(payload["epoch"]),
         "weights": "ema" if args.use_ema else "raw",
-        "split": "train",
+            "split": args.split,
         "pose_semantics": "each frame is a cumulative SE(3) transform T_camera_0_to_k, not an adjacent-frame residual",
         "episodes": report_rows,
         "outputs": {
@@ -367,7 +380,7 @@ def main() -> int:
             "goal_pose_summary": str(goal_summary_path),
         },
     }
-    report_path = output / "train_inference_report.json"
+    report_path = output / f"{args.split}_inference_report.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
     return 0
