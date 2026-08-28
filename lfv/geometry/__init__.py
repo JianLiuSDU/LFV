@@ -25,6 +25,7 @@ from .rotation6d import (
     rotation_6d_to_matrix,
     so3_geodesic_distance,
 )
+from .registration import rigid_icp_to_visible
 
 __all__ = [
     "AntipodalContactPair",
@@ -45,5 +46,6 @@ __all__ = [
     "propagate_contact_heat_to_opposite_surface",
     "rotation_6d_to_matrix",
     "so3_geodesic_distance",
+    "rigid_icp_to_visible",
     "upper_handle_oracle_config_dict",
 ]

@@ -1,0 +1,31 @@
+# Offline A100 planning contract.  Paths may be overridden on the command line.
+input_dir: /home/users1/ljian/LFV_ex/cup_pouring/ex_1/input
+output_dir: /home/users1/ljian/LFV_ex/cup_pouring/ex_1
+allow_fallback_grasp: false
+
+perception:
+  backend: precomputed
+  # The detector/SAM wrapper may instead be selected with backend: external.
+  # It must write masks.npz containing cup_mask and bowl_mask.
+
+transfer:
+  backend: precomputed
+  # A prior A100 AffCorrs/FGW run must write target_heatmap [H,W] in this file.
+  path: /home/users1/ljian/LFV_ex/cup_pouring/ex_1/input/target_heatmap.npz
+  # For in-process Stage 1 transfer use backend: affcorrs and provide source_rgb,
+  # source_mask, source_heatmap, dino_weights (plus optional device/config).
+
+completion:
+  # visible_only is a smoke-test mode and is deliberately not a completed cloud.
+  backend: visible_only
+  # backend: sam3d requires SAM3D weights and a valid pipeline config.
+  # python_executable: /home/users1/ljian/anaconda3/envs/sam3d-objects/bin/python
+  # repo: /home/users1/ljian/sam-3d-objects
+  # config: /path/to/sam3d/pipeline.yaml
+
+grasp:
+  # backend: npz consumes an offline GraspNet artifact with grasps [M,17].
+  # backend: external runs a configured GraspNet wrapper and writes grasps.npz.
+
+motion:
+  # backend: legacy_pouring or external; leave unset to test perception/heat/grasp only.
