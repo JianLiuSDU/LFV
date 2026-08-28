@@ -10,12 +10,6 @@ import torch
 @dataclass
 class ContextEncoding:
     tokens: torch.Tensor
-    # Optional field-derived tokens used only by the Goal branch.  Keeping
-    # them separate from ``tokens`` preserves checkpoint compatibility and
-    # leaves the trajectory context unchanged.
-    goal_relation_tokens: torch.Tensor | None = None
-    manipulated_anchor_xyz: torch.Tensor | None = None
-    reference_anchor_xyz: torch.Tensor | None = None
     manipulated_motion_field: torch.Tensor | None = None
     reference_motion_field: torch.Tensor | None = None
     manipulated_motion_logits: torch.Tensor | None = None
@@ -32,4 +26,3 @@ class Stage2Samples:
     goals: torch.Tensor
     trajectories: torch.Tensor
     goal_ids: torch.Tensor
-    goal_scores: torch.Tensor | None = None

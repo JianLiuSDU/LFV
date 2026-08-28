@@ -81,61 +81,6 @@ def test_sampling_is_reproducible_with_generator_seed():
     torch.testing.assert_close(first.trajectories, second.trajectories)
 
 
-def test_goal_functional_anchor_and_candidate_scoring():
-    batch = _batch(count=2)
-    model = ThreeTokenHierarchicalDiffusion(
-        dino_dim=16,
-        hidden_dim=32,
-        encoder_heads=4,
-        motion_field_mode="joint",
-        goal_relation_conditioning=True,
-        goal_candidate_scoring=True,
-        goal_layers=1,
-        trajectory_layers=1,
-        decoder_heads=4,
-        dropout=0.0,
-        num_train_timesteps=10,
-        goal_inference_steps=2,
-        trajectory_inference_steps=2,
-    )
-    model.normalizer.fit_tensors([batch["trajectory_pose9d"]])
-    losses = model.compute_loss(batch, stage="goal")
-    assert torch.isfinite(losses["goal_score"])
-    losses["total"].backward()
-    assert model.encoder.goal_relation_encoder[0].weight.grad is not None
-    samples, encoding = model.sample(
-        batch,
-        num_goal_samples=3,
-        num_trajectory_samples=1,
-        generator=torch.Generator().manual_seed(123),
-    )
-    assert encoding.goal_relation_tokens.shape == (2, 3, 32)
-    assert encoding.manipulated_anchor_xyz.shape == (2, 3)
-    assert samples.goal_scores.shape == (2, 3)
-    assert torch.isfinite(samples.goal_scores).all()
-
-
-def test_sparsemax_motion_field_is_a_simplex_and_sparse():
-    batch = _batch(count=1)
-    model = ThreeTokenHierarchicalDiffusion(
-        dino_dim=16,
-        hidden_dim=32,
-        encoder_heads=4,
-        motion_field_mode="joint",
-        motion_field_normalization="sparsemax",
-        goal_layers=1,
-        trajectory_layers=1,
-        decoder_heads=4,
-        dropout=0.0,
-        num_train_timesteps=10,
-    )
-    encoding = model.encode(batch)
-    assert encoding.manipulated_motion_field is not None
-    field = encoding.manipulated_motion_field
-    torch.testing.assert_close(field.sum(dim=1), torch.ones(1))
-    assert (field == 0).any()
-
-
 def test_joint_motion_loss_reaches_both_relevance_heads():
     batch = _batch()
     model = ThreeTokenHierarchicalDiffusion(

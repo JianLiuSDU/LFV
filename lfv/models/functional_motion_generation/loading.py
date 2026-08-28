@@ -21,22 +21,9 @@ def model_kwargs(config: dict, dino_dim: int) -> dict:
         "motion_field_temperature": float(
             model.get("motion_field_temperature", 1.0)
         ),
-        "motion_field_normalization": str(
-            model.get("motion_field_normalization", "softmax")
-        ),
         "motion_field_pair_weight": float(
             model.get("motion_field_pair_weight", 0.25)
         ),
-        "goal_relation_conditioning": bool(
-            model.get("goal_relation_conditioning", False)
-        ),
-        "goal_relation_gate_init": float(
-            model.get("goal_relation_gate_init", 0.1)
-        ),
-        "goal_candidate_scoring": bool(
-            model.get("goal_candidate_scoring", False)
-        ),
-        "goal_score_weight": float(model.get("goal_score_weight", 0.1)),
         "goal_layers": int(model.get("goal_layers", 4)),
         "trajectory_layers": int(model.get("trajectory_layers", 6)),
         "decoder_heads": int(model.get("decoder_heads", 4)),
@@ -117,15 +104,7 @@ def load_stage2_checkpoint(
     model = build_model(
         config["model"]["name"], **model_kwargs(config, dino_dim)
     )
-    missing, unexpected = model.load_state_dict(payload["model"], strict=False)
-    optional_missing = {
-        "encoder.goal_relation_gate",
-    }
-    if unexpected or any(key not in optional_missing for key in missing):
-        raise RuntimeError(
-            "Checkpoint/model mismatch: "
-            f"missing={list(missing)}, unexpected={list(unexpected)}"
-        )
+    model.load_state_dict(payload["model"])
     if use_ema:
         state = dict(model.named_parameters())
         with torch.no_grad():

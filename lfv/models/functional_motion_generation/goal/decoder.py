@@ -39,12 +39,9 @@ class GoalPoseDecoder(nn.Module):
         noisy_goal: torch.Tensor,
         timestep: torch.Tensor,
         context: torch.Tensor,
-        goal_relation_tokens: torch.Tensor | None = None,
     ) -> torch.Tensor:
         token = self.pose_embedding(noisy_goal)[:, None]
         time = self.timestep_embedding(timestep)
-        if goal_relation_tokens is not None:
-            context = torch.cat((context, goal_relation_tokens), dim=1)
         for block in self.blocks:
             token = block(token, context, time)
         return self.output(self.output_norm(token[:, 0]))
