@@ -47,3 +47,28 @@ def save_partial_grasp_overlay(
     cv2.putText(canvas, "red=visible heat contact, blue=virtual opposite contact", (16, 56), cv2.FONT_HERSHEY_SIMPLEX, 0.52, (255, 255, 255), 1, cv2.LINE_AA)
     out = Path(output); out.parent.mkdir(parents=True, exist_ok=True); cv2.imwrite(str(out), canvas)
 
+
+def save_contact_pair_ply(points_camera: np.ndarray, heat: np.ndarray, first_contact: np.ndarray, second_contact: np.ndarray, tcp_camera: np.ndarray, output: str | Path) -> None:
+    """Write a dependency-free colored PLY for later Open3D inspection."""
+    p = np.asarray(points_camera, dtype=np.float32).reshape(-1, 3)
+    h = np.clip(np.asarray(heat, dtype=np.float32).reshape(-1), 0.0, 1.0)
+    if len(p) != len(h):
+        raise ValueError("points_camera and heat must have equal length")
+    # Jet-like RGB without requiring matplotlib; the exact colormap is not
+    # important here, while preserving heat in the vertex colors is.
+    rgb = np.stack((np.clip(1.5 * h, 0, 1), np.clip(1.5 - np.abs(2 * h - 1.0) * 2, 0, 1), np.clip(1.5 * (1 - h), 0, 1)), -1)
+    vertices = [(float(x), float(y), float(z), int(255 * r), int(255 * g), int(255 * b)) for (x, y, z), (r, g, b) in zip(p, rgb)]
+    extra = [(first_contact, (255, 0, 0)), (second_contact, (0, 80, 255)), (tcp_camera[:3, 3], (255, 255, 255))]
+    extra_idx = []
+    for point, color in extra:
+        extra_idx.append(len(vertices)); vertices.append((float(point[0]), float(point[1]), float(point[2]), *color))
+    edges = [(extra_idx[0], extra_idx[1]), (extra_idx[0], extra_idx[2]), (extra_idx[1], extra_idx[2])]
+    out = Path(output); out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open("w", encoding="ascii") as f:
+        f.write("ply\nformat ascii 1.0\n")
+        f.write(f"element vertex {len(vertices)}\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\n")
+        f.write(f"element edge {len(edges)}\nproperty int vertex1\nproperty int vertex2\nend_header\n")
+        for row in vertices:
+            f.write("%.7f %.7f %.7f %d %d %d\n" % row)
+        for e in edges:
+            f.write(f"{e[0]} {e[1]}\n")
