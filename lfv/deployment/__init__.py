@@ -4,5 +4,6 @@ from .input_schema import CameraInput, load_camera_input
 from .output_schema import CameraPlanResult
 from .camera_plan_pipeline import CameraToPlanPipeline
 from .episode_reader import EpisodeFrame, read_episode_frame, read_episode_sequence
+from .partial_grasp import ContactPairHypothesis, build_contact_pair_hypotheses, evaluate_contact_pair_against_full_cloud
 
-__all__ = ["CameraInput", "CameraPlanResult", "CameraToPlanPipeline", "EpisodeFrame", "load_camera_input", "read_episode_frame", "read_episode_sequence"]
+__all__ = ["CameraInput", "CameraPlanResult", "CameraToPlanPipeline", "EpisodeFrame", "ContactPairHypothesis", "build_contact_pair_hypotheses", "evaluate_contact_pair_against_full_cloud", "load_camera_input", "read_episode_frame", "read_episode_sequence"]
