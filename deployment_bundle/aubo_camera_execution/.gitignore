@@ -1,0 +1,6 @@
+# Runtime/sample artifacts stay local and are copied manually to the robot PC.
+sample_plan/*.npz
+sample_plan/*.png
+sample_plan/*.ply
+sample_plan/*.json
+
