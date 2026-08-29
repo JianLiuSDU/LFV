@@ -94,6 +94,8 @@ inference/
 
 `motion_field.npz` 保存 Stage 2 encoder 输出的操作物体/参考物体 motion field，便于检查功能区域是否集中。PNG 和 PLY 用于人工复核，不直接控制机械臂。
 
+需要区分两个“迁移”：本入口中的 Stage 1 `run_transfer` 明确迁移的是源示范的 Contact Field；Stage 2 checkpoint 中的 Motion Functional Field 则由其 relevance head 根据当前目标的 XYZ–DINO 在线预测并保存。当前仓库没有一个独立的“源 Motion Field→目标 Motion Field”FGW 接口，因此这里不会把 Contact 迁移结果误称为运动场迁移，也不会人为拼接一个不存在的先验。
+
 ## 机器人电脑如何使用
 
 Aubo/其他机器人电脑只需要接收 `camera_plan.npz`，无需运行 Grounding-DINO、SAM2 或 Stage 2 网络。执行端使用手眼标定得到的相机到机器人基座变换：
