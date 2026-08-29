@@ -118,7 +118,7 @@ class FunctionalMotionDirectBackend:
         import torch.nn.functional as F
         from lfv.features.dinov2_dense import DinoV2DenseExtractor
         from lfv.geometry import local_delta_to_camera, pose9d_to_matrix_np
-        from lfv.inference.functional_motion.two_stage import localize_clouds, sample_heat_point_cloud, sample_mask_point_cloud
+        from lfv.inference.functional_motion.two_stage import localize_clouds, sample_mask_point_cloud
         from lfv.models.functional_motion_generation import load_stage2_checkpoint
         from lfv.models.functional_motion_generation.motion_field_transfer import MotionFieldMemory, transport_motion_field
         from lfv.visualization.motion_field import save_motion_field_comparison
@@ -126,7 +126,11 @@ class FunctionalMotionDirectBackend:
         workdir = Path(workdir); workdir.mkdir(parents=True, exist_ok=True)
         device = torch.device(self.device)
         model, _, _ = load_stage2_checkpoint(self.checkpoint, device=device, use_ema=True)
-        m_points, m_pixels, m_heat = sample_heat_point_cloud(heatmap, cup_mask, depth_m, intrinsic_cv, 256)
+        # Stage 1 heat samples are only for grasp instantiation. Stage 2 was
+        # trained on the complete manipulated-object mask, so feeding the
+        # contact-only subset here would collapse its motion field onto the
+        # contact region and corrupt the trajectory distribution.
+        m_points, m_pixels = sample_mask_point_cloud(cup_mask, depth_m, intrinsic_cv, 256)
         r_points, r_pixels = sample_mask_point_cloud(bowl_mask, depth_m, intrinsic_cv, 256)
         m_local, r_local, centroid = localize_clouds(m_points, r_points)
         extractor = DinoV2DenseExtractor(model_name="vit_small_patch14_dinov2", weights_path=self.dino_weights, device=self.device)
@@ -164,13 +168,20 @@ class FunctionalMotionDirectBackend:
         goal = local_delta_to_camera(pose9d_to_matrix_np(goal_local), centroid, 1.0)
         # Pose9D matrices already contain the local relative transform; convert
         # each around the manipulated centroid with the same Stage 2 adapter.
-        trajectory = np.stack(
+        trajectory_delta = np.stack(
             [
                 local_delta_to_camera(pose9d_to_matrix_np(pose), centroid, 1.0)
                 for pose in traj_local
             ],
             axis=0,
         ).astype(np.float32)
+        # The diffusion trajectory is an object-relative delta sequence whose
+        # first frame is identity. Restore the camera-frame initial object
+        # pose before composing the fixed goal-to-gripper attachment; omitting
+        # this transform causes a large first-frame jump in the TCP path.
+        object_initial_camera = np.eye(4, dtype=np.float32)
+        object_initial_camera[:3, 3] = centroid
+        trajectory = trajectory_delta @ object_initial_camera
         field_path = workdir / "motion_field.npz"
         payload = {}
         if encoding.manipulated_motion_field is not None: payload["manipulated_motion_field_fused"] = encoding.manipulated_motion_field[0].cpu().numpy()
@@ -185,4 +196,4 @@ class FunctionalMotionDirectBackend:
             online_m = online_encoding.manipulated_motion_field[0].cpu().numpy() if online_encoding.manipulated_motion_field is not None else manipulated_fused
             online_r = online_encoding.reference_motion_field[0].cpu().numpy() if online_encoding.reference_motion_field is not None else reference_fused
             save_motion_field_comparison(rgb, m_pixels, r_pixels, online_m, online_r, None if prior_m is None else prior_m[0].cpu().numpy(), None if prior_r is None else prior_r[0].cpu().numpy(), manipulated_fused, reference_fused, workdir / "motion_field_comparison.png")
-        return MotionPrediction(goal.astype(np.float32), trajectory.astype(np.float32), {"backend": "functional_motion_direct", "checkpoint": str(self.checkpoint), "dino_weights": str(self.dino_weights), "stage2_point_count": 256, "motion_memory": None if self.motion_memory is None else str(self.motion_memory), "motion_field_prior_weight": self.motion_field_prior_weight, "effective_motion_field_prior_weight": effective_prior_weight, "motion_field_transfer_confidence": transfer_confidence, "motion_field_artifact": str(field_path) if payload else None, "motion_field_comparison": str(workdir / "motion_field_comparison.png") if encoding.manipulated_motion_field is not None else None})
+        return MotionPrediction(goal.astype(np.float32), trajectory.astype(np.float32), {"backend": "functional_motion_direct", "checkpoint": str(self.checkpoint), "dino_weights": str(self.dino_weights), "stage2_point_count": 256, "stage2_manipulated_sampling": "full_cup_mask", "stage2_reference_sampling": "full_bowl_mask", "object_trajectory_semantics": "camera_absolute_pose = predicted_delta @ initial_object_pose", "object_initial_camera": object_initial_camera.tolist(), "motion_memory": None if self.motion_memory is None else str(self.motion_memory), "motion_field_prior_weight": self.motion_field_prior_weight, "effective_motion_field_prior_weight": effective_prior_weight, "motion_field_transfer_confidence": transfer_confidence, "motion_field_artifact": str(field_path) if payload else None, "motion_field_comparison": str(workdir / "motion_field_comparison.png") if encoding.manipulated_motion_field is not None else None})

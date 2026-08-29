@@ -180,7 +180,11 @@ def main() -> int:
         pred = motion.predict(workdir=out / "stage2_motion", rgb=rgb, depth_m=depth, cup_mask=masks["cup"], bowl_mask=masks["bowl"], intrinsic_cv=k, heatmap=heat)
         motion_metadata = pred.metadata
         trajectory = np.asarray(pred.object_trajectory_camera, dtype=np.float32)
-        attachment = np.linalg.inv(pred.goal_camera) @ selected.tcp_camera
+        object_initial = np.asarray(pred.metadata["object_initial_camera"], dtype=np.float32).reshape(4, 4)
+        # The grasp is made at the initial object pose. Keep the fixed
+        # object-to-TCP attachment from that pose throughout the trajectory;
+        # using goal^-1 here creates a large initial jump.
+        attachment = np.linalg.inv(object_initial) @ selected.tcp_camera
         tcp_trajectory = trajectory @ attachment
         np.savez_compressed(out / "motion_prediction.npz", goal_camera=pred.goal_camera, object_trajectory_camera=trajectory, tcp_trajectory_camera=tcp_trajectory, attachment_camera=attachment)
     else:

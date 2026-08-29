@@ -12,7 +12,7 @@ RGB-D + intrinsics.yaml
         ├─ lfv.affordance_transfer.app.run_transfer
         │    既有 Soft Heatmap AffCorrs + FGW，迁移 hand_pouring_lfv/episode_0 的 Contact Field
         ├─ lfv.inference.functional_motion.two_stage_pouring
-        │    既有采样器：操作物体 256 点、参考物体 256 点，并保持点/DINO 对齐
+        │    既有采样器：完整操作物体 mask 256 点、完整参考物体 mask 256 点，并保持点/DINO 对齐
 ├─ lfv.deployment.model_backend.FunctionalMotionDirectBackend
 │    当前 Stage 2 joint functional-motion checkpoint（XYZ+DINO、三 token、Goal/Full64）
 │    可选读取 memory .npz，将源 Motion Field 用 FGW 输运并与在线场融合
@@ -110,7 +110,7 @@ inference/
 
 `motion_field.npz` 保存 Stage 2 encoder 输出的操作物体/参考物体 motion field，便于检查功能区域是否集中。PNG 和 PLY 用于人工复核，不直接控制机械臂。
 
-Stage 2 现在支持可选的 motion memory：`scripts/stage2/build_motion_field_memory.py` 从一个缓存 episode 和 motion-field checkpoint 导出源 XYZ、DINO 和 relevance field；推理时用同一 FGW 结构/语义输运算子把两部分源场传到当前 256 点云，再按 `motion-field-prior-weight` 与当前 relevance head 的在线场融合，融合后的三 token 继续进入原有 Goal/Full64 diffusion。`motion_field_comparison.png` 对比 online、memory prior 和 fused 三种场。
+Stage 2 现在支持可选的 motion memory：`scripts/stage2/build_motion_field_memory.py` 从一个缓存 episode 和 motion-field checkpoint 导出源 XYZ、DINO 和 relevance field；推理时用同一 FGW 结构/语义输运算子把两部分源场传到当前 256 点云，再按 `motion-field-prior-weight` 与当前 relevance head 的在线场融合，融合后的三 token 继续进入原有 Goal/Full64 diffusion。Stage 2 的操作物体输入始终来自完整 cup mask，不能使用 Stage 1 的 contact-only 热力采样；后者只用于抓取候选实例化。`motion_field_comparison.png` 对比 online、memory prior 和 fused 三种场。
 
 需要区分两个“迁移”：Stage 1 `run_transfer` 迁移的是源示范 Contact Field；Stage 2 memory 迁移的是训练后导出的 Motion Functional Field。两者均复用 FGW，但场的来源和用途不同。
 
@@ -122,7 +122,7 @@ Aubo/其他机器人电脑只需要接收 `camera_plan.npz`，无需运行 Groun
 T_robot_tcp = T_robot_camera · T_camera_tcp
 ```
 
-然后对抓取位姿和 64 步轨迹逐帧执行 IK、关节限位、碰撞检查、速度/加速度约束和夹爪开合。`tcp_camera` 的坐标约定为 OpenCV 相机系（x 向右、y 向下、z 向前）；若机器人驱动使用其他轴约定，必须在执行端显式转换，不能修改保存的模型输出。
+然后对抓取位姿和 64 步轨迹逐帧执行 IK、关节限位、碰撞检查、速度/加速度约束和夹爪开合。轨迹的固定 attachment 定义为 `inv(object_initial_camera) @ tcp_camera`，而不是 `inv(goal_camera) @ tcp_camera`；这样第一帧保持在抓取位姿。`tcp_camera` 的坐标约定为 OpenCV 相机系（x 向右、y 向下、z 向前）；若机器人驱动使用其他轴约定，必须在执行端显式转换，不能修改保存的模型输出。
 
 ## 当前实现边界
 
