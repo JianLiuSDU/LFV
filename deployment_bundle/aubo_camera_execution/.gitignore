@@ -3,4 +3,4 @@ sample_plan/*.npz
 sample_plan/*.png
 sample_plan/*.ply
 sample_plan/*.json
-
+**/__pycache__/
