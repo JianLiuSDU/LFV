@@ -1,0 +1,19 @@
+bundle: lfv_aubo_camera_execution
+version: 1
+status: validated_dry_run
+coordinate_convention: opencv_camera
+required_files:
+  - sample_plan/camera_plan.npz
+  - config/handeye.yaml
+  - scripts/execute_camera_plan_aubo.py
+optional_review_files:
+  - sample_plan/strict_inference_report.json
+  - sample_plan/inference_overlay.png
+  - sample_plan/camera_grasp_trajectory.ply
+robot_interface: AuboAdapter in scripts/execute_camera_plan_aubo.py
+execution_default: dry_run
+handeye_direction: camera_to_aubo_base
+planner_output_keys:
+  tcp_camera: [4, 4]
+  tcp_trajectory_camera: [64, 4, 4]
+  object_trajectory_camera: [64, 4, 4]

@@ -1,0 +1,15 @@
+# Fill this matrix with the calibrated OpenCV-camera -> Aubo-base transform.
+# It must map homogeneous camera-frame points/poses to the robot base frame:
+#   T_base_tcp = T_base_camera @ T_camera_tcp
+T_base_camera:
+  - [1.0, 0.0, 0.0, 0.0]
+  - [0.0, 1.0, 0.0, 0.0]
+  - [0.0, 0.0, 1.0, 0.0]
+  - [0.0, 0.0, 0.0, 1.0]
+
+# Safety defaults; tune only after checking the Aubo workspace.
+pregrasp_distance_m: 0.10
+approach_steps: 20
+trajectory_speed_m_s: 0.05
+approach_speed_m_s: 0.02
+settle_seconds: 0.25
