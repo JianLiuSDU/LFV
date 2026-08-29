@@ -3,8 +3,8 @@
 
 Unlike the earlier smoke script, this entry point has no GrabCut or synthetic
 mask fallback.  It calls the existing Grounding-DINO detector, SAM2 box
-segmenter, AffCorrs+FGW transfer, and the original pouring 256/64 sampler and
-checkpoints.  A small top-down contact-pair selector is only the final grasp
+segmenter, AffCorrs+FGW transfer, the fixed 256-point sampler and Full64 joint
+functional-motion checkpoint. A small top-down contact-pair selector is only the final grasp
 instantiation requested by the deployment contract.
 """
 
@@ -22,9 +22,8 @@ import yaml
 from PIL import Image
 
 from lfv.affordance_transfer.app import run_transfer
-from lfv.deployment.model_backend import LegacyPouringBackend
+from lfv.deployment.model_backend import FunctionalMotionDirectBackend
 from lfv.deployment.partial_grasp import build_contact_pair_hypotheses
-from lfv.geometry.sam3d_completion import backproject_mask
 from lfv.inference.functional_motion.two_stage_pouring import sample_heat_point_cloud, sample_mask_point_cloud
 from lfv.pipeline.dino_bbox import _load_model as load_grounding_dino, get_object_bbox
 from lfv.visualization.contact_pair import save_contact_pair_ply, save_partial_grasp_overlay
@@ -86,11 +85,8 @@ def main() -> int:
     p.add_argument("--sam2-root", type=Path, default=Path("/home/users1/ljian/sam2"))
     p.add_argument("--device", default="cpu", help="shared perception/Stage1 device")
     p.add_argument("--stage2-device", default="cpu")
-    p.add_argument("--model-repo", type=Path, default=Path("/home/users1/ljian/object_centric_diffusion"))
-    p.add_argument("--goal-checkpoint", type=Path, default=Path("/home/users1/ljian/object_centric_diffusion/data/outputs_local_goal_pose/pouring_seed42/20260428_171300/checkpoints/epoch=0700-val_sample_goal_pos_err_cm=3.086.ckpt"))
-    p.add_argument("--trajectory-checkpoint", type=Path, default=Path("/home/users1/ljian/object_centric_diffusion/data/outputs_goal_full64/pouring_seed42/20260429_210924/checkpoints/epoch=1500.ckpt"))
-    p.add_argument("--language-embedding", type=Path, default=Path("/media/ljian/lj/data_3d/pouring/lang_emb.npy"))
-    p.add_argument("--model-python", default="/home/users1/ljian/anaconda3/envs/sam3d-objects/bin/python")
+    p.add_argument("--stage2-checkpoint", type=Path, default=Path("/home/users1/ljian/lfv_runs/stage2/ablation_stage_aware/a3b_gated_phase_tokens/checkpoints/best.pt"))
+    p.add_argument("--dino-weights", type=Path, default=Path("/home/users1/ljian/LFV/third_party/dinov2_weights/dinov2_vits14_pretrain.pth"))
     p.add_argument("--skip-stage2", action="store_true")
     args = p.parse_args()
     root = args.input_dir.expanduser().resolve(); out = (args.output_dir or root.parent / "strict_inference").expanduser().resolve(); out.mkdir(parents=True, exist_ok=True)
@@ -133,8 +129,9 @@ def main() -> int:
     transfer_run = run_transfer(transfer_cfg, output_dir_override=out / "stage1_transfer", device_override=args.device)
     heat = np.asarray(transfer_run["result"].target_heatmap, dtype=np.float32)
 
-    # Stage 2's original sampler is used for both the grasp evidence and the
-    # model input: 256 points at Stage 1 resolution, then the first 64 points.
+    # The repository's fixed Stage 2 contract is used for both grasp evidence
+    # and model input: 256 manipulated points and 256 reference points. The
+    # trajectory decoder returns the trained Full64 sequence.
     points256, pixels256, heat256 = sample_heat_point_cloud(heat, masks["cup"], depth, k, 256)
     target256, target_pixels256 = sample_mask_point_cloud(masks["bowl"], depth, k, 256)
     hypotheses = build_contact_pair_hypotheses(points256, heat256, top_k=8)
@@ -143,7 +140,7 @@ def main() -> int:
     selected = hypotheses[0]
     trajectory = None
     if not args.skip_stage2:
-        motion = LegacyPouringBackend(model_repo=args.model_repo, goal_checkpoint=args.goal_checkpoint, trajectory_checkpoint=args.trajectory_checkpoint, language_embedding=args.language_embedding, python_executable=args.model_python, seed=42, device=args.stage2_device)
+        motion = FunctionalMotionDirectBackend(checkpoint=args.stage2_checkpoint, dino_weights=args.dino_weights, device=args.stage2_device, seed=42, num_goals=1, num_trajectories=1)
         pred = motion.predict(workdir=out / "stage2_motion", rgb=rgb, depth_m=depth, cup_mask=masks["cup"], bowl_mask=masks["bowl"], intrinsic_cv=k, heatmap=heat)
         trajectory = np.asarray(pred.object_trajectory_camera, dtype=np.float32)
         attachment = np.linalg.inv(pred.goal_camera) @ selected.tcp_camera
@@ -154,7 +151,7 @@ def main() -> int:
     save_partial_grasp_overlay(rgb, k, heat, masks["cup"], selected.first_contact_camera, selected.second_contact_camera, selected.tcp_camera, out / "inference_overlay.png", title="Strict DINO+SAM2+AffCorrs/FGW+Stage2", trajectory_camera=tcp_trajectory)
     save_contact_pair_ply(points256, heat256, selected.first_contact_camera, selected.second_contact_camera, selected.tcp_camera, out / "camera_grasp_trajectory.ply", trajectory_camera=tcp_trajectory)
     np.savez_compressed(out / "camera_plan.npz", tcp_camera=selected.tcp_camera, first_contact_camera=selected.first_contact_camera, second_contact_camera=selected.second_contact_camera, object_trajectory_camera=np.empty((0, 4, 4), np.float32) if trajectory is None else trajectory, tcp_trajectory_camera=np.empty((0, 4, 4), np.float32) if tcp_trajectory is None else tcp_trajectory, manipulated_points_stage1=points256, manipulated_pixels_stage1=pixels256, manipulated_heat_stage1=heat256, target_points_stage1=target256, target_pixels_stage1=target_pixels256, intrinsic_cv=k)
-    report = {"input_rgb": str(rgb_path), "input_depth": str(depth_path), "detector": {"implementation": "lfv.pipeline.dino_bbox Grounding-DINO", "prompts": prompts, "boxes": {k: v.tolist() for k, v in boxes.items()}}, "segmenter": {"implementation": "lfv.pipeline.sam2_mask SAM2", "scores": sam_scores, "checkpoint": str(perception_cfg.sam2.checkpoint)}, "stage1": {"implementation": "run_transfer + AffCorrsFGWContactTransferPipeline", "source": transfer_cfg["source"], "accepted": bool(transfer_run["result"].accepted), "confidence": transfer_run["result"].confidence}, "sampling": {"stage1_manipulated": list(points256.shape), "stage1_target": list(target256.shape), "stage2_manipulated": [64, 3], "stage2_target": [64, 3], "implementation": "lfv.inference.functional_motion.two_stage_pouring"}, "grasp": selected.as_dict(), "trajectory_steps": 0 if trajectory is None else int(len(trajectory)), "output_dir": str(out)}
+    report = {"input_rgb": str(rgb_path), "input_depth": str(depth_path), "detector": {"implementation": "lfv.pipeline.dino_bbox Grounding-DINO", "prompts": prompts, "boxes": {k: v.tolist() for k, v in boxes.items()}}, "segmenter": {"implementation": "lfv.pipeline.sam2_mask SAM2", "scores": sam_scores, "checkpoint": str(perception_cfg.sam2.checkpoint)}, "stage1": {"implementation": "run_transfer + AffCorrsFGWContactTransferPipeline", "source": transfer_cfg["source"], "accepted": bool(transfer_run["result"].accepted), "confidence": transfer_run["result"].confidence}, "sampling": {"stage1_manipulated": list(points256.shape), "stage1_target": list(target256.shape), "stage2_manipulated": [256, 3], "stage2_target": [256, 3], "trajectory": [64, 9], "implementation": "lfv.inference.functional_motion.two_stage_pouring"}, "grasp": selected.as_dict(), "trajectory_steps": 0 if trajectory is None else int(len(trajectory)), "output_dir": str(out)}
     (out / "strict_inference_report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False, default=lambda x: None), encoding="utf-8")
     print(json.dumps({"output": str(out), "stage1_accepted": report["stage1"]["accepted"], "trajectory_steps": report["trajectory_steps"], "files": ["detection_segmentation_overlay.png", "stage1_transfer/transfer_summary.png", "inference_overlay.png", "camera_plan.npz", "camera_grasp_trajectory.ply", "strict_inference_report.json"]}, ensure_ascii=False, indent=2))
     return 0

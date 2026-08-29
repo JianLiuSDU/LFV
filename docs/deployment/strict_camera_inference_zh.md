@@ -1,89 +1,73 @@
-# 严格复用既有 LFV 推理流程
+# 严格相机输入推理接口
 
-入口脚本：
-
-```text
-scripts/deployment/run_strict_camera_inference.py
-```
-
-该脚本不使用 GrabCut、手工 mask 或合成点云 fallback。它严格串联已有模块：
+`scripts/deployment/run_strict_camera_inference.py` 是当前仓库的正式单帧入口。它从一个文件夹读取 RGB-D 和相机内参，按训练/实验中已经固定的模块顺序生成相机坐标系抓取位姿和对象轨迹：
 
 ```text
-RGB-D + 内参
-   │
-   ├─ lfv.pipeline.dino_bbox
-   │    Grounding-DINO 检测 cup / bowl，输出检测框
-   │
-   ├─ lfv.pipeline.sam2_mask
-   │    SAM2 根据检测框分别分割 cup / bowl
-   │
-   ├─ lfv.affordance_transfer.app.run_transfer
-   │    AffCorrs + FGW，源为 hand_pouring_lfv/episode_0 frame 39
-   │
-   ├─ lfv.inference.functional_motion.two_stage_pouring
-   │    sample_heat_point_cloud(..., 256)
-   │    sample_mask_point_cloud(..., 256)
-   │    Stage 2 使用原逻辑取前 64 点
-   │
-   ├─ 已训练 pouring goal checkpoint
-   ├─ 已训练 Full64 trajectory checkpoint
-   │
-   └─ top-down 接触对实例化 → camera-frame TCP + trajectory
+RGB-D + intrinsics.yaml
+        │
+        ├─ lfv.pipeline.dino_bbox
+        │    Grounding-DINO 检测 cup / bowl，保存两个 bbox
+        ├─ lfv.pipeline.sam2_mask
+        │    SAM2 以 bbox 为提示，分别保存 cup / bowl mask
+        ├─ lfv.affordance_transfer.app.run_transfer
+        │    既有 Soft Heatmap AffCorrs + FGW，迁移 hand_pouring_lfv/episode_0 的 Contact Field
+        ├─ lfv.inference.functional_motion.two_stage_pouring
+        │    既有采样器：操作物体 256 点、参考物体 256 点，并保持点/DINO 对齐
+        ├─ lfv.deployment.model_backend.FunctionalMotionDirectBackend
+        │    当前 Stage 2 joint functional-motion checkpoint（XYZ+DINO、三 token、Goal/Full64）
+        └─ contact-pair grasp instantiation
+             top-down、跨接触区域两侧的相机系 TCP 抓取姿态
 ```
 
-## 运行环境
+因此，该入口不使用 GrabCut、手工 ROI、合成 mask、随机点云或旧的语言条件 legacy 模型。检测、分割、Stage 1 迁移和 Stage 2 输入采样都直接调用仓库中原有实现；最后的接触对选择只是将连续 Contact 热力实例化为可执行的 top-down 平行夹爪候选，不改变训练模型。
 
-推荐使用已经包含 DINOv2、Grounding-DINO、SAM2 和 PyTorch 的环境，例如：
+## 输入目录
+
+目录至少包含：
 
 ```text
-/home/users1/ljian/anaconda3/envs/tapip3d/bin/python
+input/
+├── rgb.png                 # 任意 RGB 文件名均可
+├── depth.png               # 16-bit 深度，和 RGB 对齐
+└── intrinsics.yaml         # 见下例
 ```
 
-需要在执行电脑准备：
+```yaml
+camera:
+  color:
+    camera_matrix: [[fx, 0, cx], [0, fy, cy], [0, 0, 1]]
+  depth:
+    depth_scale_m_per_unit: 0.001
+```
 
-1. LFV 代码仓库；
-2. Grounding-DINO 模型 `IDEA-Research/grounding-dino-base`（可通过 `object.model_id` 改成已下载的本地目录）；
-3. SAM2 源码目录，例如 `/home/users1/ljian/sam2`；
-4. SAM2 权重：`/home/users1/ljian/sam2/checkpoints/sam2.1_hiera_large.pt`；
-5. DINOv2 权重：`third_party/dinov2_weights/dinov2_vits14_pretrain.pth`；
-6. `hand_pouring_lfv/episode_0` 源示范数据和 `contact_heatmap`；
-7. Stage 2 的 goal/trajectory checkpoint 和语言 embedding。
+深度会先乘以 `depth_scale_m_per_unit` 转成米，再用 OpenCV 相机内参反投影。RGB 和 depth 必须同分辨率且像素对齐；手眼标定不在此入口中完成。
 
-Grounding-DINO 和 SAM2 没有可用权重时，严格入口会直接报错，不会偷偷退回到人工 ROI。这样可以避免把不符合论文/实验协议的 mask 当成正式结果。
+## 运行
 
-## 在服务器上运行
+先把 Grounding-DINO、SAM2 和 DINOv2 权重准备在目标机器上，或把配置/命令行参数指向本地路径：
 
 ```bash
-cd /home/users1/ljian/LFV_stage2_motion_field
-
-PYTHONPATH=. \
-/home/users1/ljian/anaconda3/envs/tapip3d/bin/python \
-scripts/deployment/run_strict_camera_inference.py \
-  --input-dir /home/users1/ljian/LFV_ex/cup_pouring/ex_1/input \
-  --output-dir /home/users1/ljian/LFV_ex/cup_pouring/ex_1/strict_inference \
-  --device cpu \
-  --stage2-device cpu \
-  --model-repo /path/to/object_centric_diffusion \
-  --goal-checkpoint /path/to/goal.ckpt \
-  --trajectory-checkpoint /path/to/trajectory.ckpt \
-  --language-embedding /path/to/lang_emb.npy \
-  --model-python /path/to/python
+cd /path/to/LFV_stage2_motion_field
+PYTHONPATH=. python scripts/deployment/run_strict_camera_inference.py \
+  --input-dir /path/to/input \
+  --output-dir /path/to/inference \
+  --perception-config configs/pipeline/hand_pouring.yaml \
+  --transfer-config configs/affordance_transfer/episode0_to_ace_red_mug_fgw_k64.yaml \
+  --sam2-root /path/to/sam2 \
+  --stage2-checkpoint /path/to/stage2/best.pt \
+  --dino-weights /path/to/dinov2_vits14_pretrain.pth \
+  --device cuda:0 \
+  --stage2-device cuda:0
 ```
 
-有 GPU 时可分别改成 `--device cuda:0 --stage2-device cuda:0`。脚本会自动读取：
+没有可用的 Grounding-DINO/SAM2 权重时脚本会直接报错，不会悄悄改用人工分割。`perception-config` 中的 `objects.affordance.prompt` 和 `objects.target.prompt` 分别控制两个检测目标；换任务时只替换配置和 Stage 1 source memory，不修改 pipeline 代码。
 
-* RGB 图像；
-* 16-bit 深度图，并按 `intrinsics.yaml` 中的 `depth_scale_m_per_unit` 转成米；
-* YAML 中的 color camera matrix。
-
-## 输出文件
+## 输出
 
 ```text
-strict_inference/
-├── cup_bbox.npy
-├── bowl_bbox.npy
-├── cup_mask.png
-├── bowl_mask.png
+inference/
+├── cup_bbox.npy, bowl_bbox.npy
+├── cup_mask.png, bowl_mask.png
 ├── detection_segmentation_overlay.png
 ├── camera_snapshot.npz
 ├── stage1_transfer/
@@ -91,7 +75,7 @@ strict_inference/
 │   ├── transfer_summary.png
 │   └── transfer_report.json
 ├── stage2_motion/
-│   └── legacy_motion/pouring_motion_prediction.npz
+│   └── motion_field.npz
 ├── motion_prediction.npz
 ├── camera_plan.npz
 ├── camera_grasp_trajectory.ply
@@ -99,29 +83,35 @@ strict_inference/
 └── strict_inference_report.json
 ```
 
-机械臂执行端主要读取 `camera_plan.npz`：
+`camera_plan.npz` 是执行端的主要接口：
 
-* `tcp_camera`：抓取 TCP，相机坐标系；
-* `tcp_trajectory_camera`：64 步 TCP 轨迹，相机坐标系；
-* `object_trajectory_camera`：对象轨迹；
-* `intrinsic_cv`：本次相机内参。
+* `tcp_camera`: `[4,4]` 相机坐标系 TCP 抓取位姿；
+* `tcp_trajectory_camera`: `[64,4,4]` Stage 2 Full64 TCP 轨迹；
+* `object_trajectory_camera`: `[64,4,4]` 对象轨迹；
+* `first_contact_camera`、`second_contact_camera`: 接触对两侧点；
+* `intrinsic_cv`: 本次相机内参；
+* `manipulated_points_stage1`、`manipulated_heat_stage1`: 256 点 Stage 1 证据。
 
-执行前必须使用目标机器人的手眼标定矩阵完成：
+`motion_field.npz` 保存 Stage 2 encoder 输出的操作物体/参考物体 motion field，便于检查功能区域是否集中。PNG 和 PLY 用于人工复核，不直接控制机械臂。
+
+## 机器人电脑如何使用
+
+Aubo/其他机器人电脑只需要接收 `camera_plan.npz`，无需运行 Grounding-DINO、SAM2 或 Stage 2 网络。执行端使用手眼标定得到的相机到机器人基座变换：
 
 ```text
 T_robot_tcp = T_robot_camera · T_camera_tcp
 ```
 
-然后再做 Aubo IK、关节限位、碰撞检查和速度规划。`camera_grasp_trajectory.ply` 和 PNG 仅用于复核，不直接控制机械臂。
+然后对抓取位姿和 64 步轨迹逐帧执行 IK、关节限位、碰撞检查、速度/加速度约束和夹爪开合。`tcp_camera` 的坐标约定为 OpenCV 相机系（x 向右、y 向下、z 向前）；若机器人驱动使用其他轴约定，必须在执行端显式转换，不能修改保存的模型输出。
 
-## 配置替换
+## 当前实现边界
 
-如果换相机，只需要保证：
+本入口已经严格复用：
 
-* RGB 和 depth 分辨率一致并且深度对齐到 color；
-* 更新 `intrinsics.yaml`；
-* 修改 `--input-dir`；
-* 将 Grounding-DINO/SAM2/DINOv2 权重路径改为新电脑的路径；
-* 将 Stage 2 checkpoint 和 `lang_emb.npy` 改为新电脑路径。
+1. `lfv.pipeline.dino_bbox` 的 Grounding-DINO 检测；
+2. `lfv.pipeline.sam2_mask` 的 SAM2 box 分割；
+3. `lfv.affordance_transfer.app.run_transfer` 的 AffCorrs+FGW Contact 迁移；
+4. `sample_heat_point_cloud` / `sample_mask_point_cloud` 的固定 256 点采样；
+5. `FunctionalMotionDirectBackend` 加载的当前 Stage 2 joint checkpoint、DINOv2 逐点特征、三 token encoder、Goal diffusion 和 Full64 trajectory diffusion。
 
-推理算法本身不需要改动。若新机械臂使用 Aubo，只需在执行端把相机坐标系轨迹转换为 Aubo 基座坐标系，并实现 Aubo 的 IK/轨迹发送接口。
+当前服务器若缺少 `iopath`、兼容版本的 `transformers` 或 Grounding-DINO 本地权重，无法完成正式 strict run；这属于环境/权重问题，不应以 GrabCut 或旧模型结果冒充正式推理。可先运行 `python -m py_compile` 做代码检查，准备好依赖和权重后再执行上述命令。

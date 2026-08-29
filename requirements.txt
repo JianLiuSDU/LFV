@@ -28,3 +28,4 @@ huggingface_hub
 pytest
 python-box[all]~=7.0
 timm
+iopath>=0.1.10
