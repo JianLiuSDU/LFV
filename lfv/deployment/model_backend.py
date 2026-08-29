@@ -142,7 +142,13 @@ class FunctionalMotionDirectBackend:
         goal = local_delta_to_camera(pose9d_to_matrix_np(goal_local), centroid, 1.0)
         # Pose9D matrices already contain the local relative transform; convert
         # each around the manipulated centroid with the same Stage 2 adapter.
-        trajectory = local_delta_to_camera(pose9d_to_matrix_np(traj_local), centroid, 1.0)
+        trajectory = np.stack(
+            [
+                local_delta_to_camera(pose9d_to_matrix_np(pose), centroid, 1.0)
+                for pose in traj_local
+            ],
+            axis=0,
+        ).astype(np.float32)
         field_path = workdir / "motion_field.npz"
         payload = {}
         if encoding.manipulated_motion_field is not None: payload["manipulated_motion_field"] = encoding.manipulated_motion_field[0].cpu().numpy()

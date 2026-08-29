@@ -54,13 +54,17 @@ PYTHONPATH=. python scripts/deployment/run_strict_camera_inference.py \
   --perception-config configs/pipeline/hand_pouring.yaml \
   --transfer-config configs/affordance_transfer/episode0_to_ace_red_mug_fgw_k64.yaml \
   --sam2-root /path/to/sam2 \
+  --sam2-python /path/to/conda/envs/sam2/bin/python \
+  --sam2-device cuda:0 \
   --stage2-checkpoint /path/to/stage2/best.pt \
   --dino-weights /path/to/dinov2_vits14_pretrain.pth \
   --device cuda:0 \
   --stage2-device cuda:0
 ```
 
-没有可用的 Grounding-DINO/SAM2 权重时脚本会直接报错，不会悄悄改用人工分割。`perception-config` 中的 `objects.affordance.prompt` 和 `objects.target.prompt` 分别控制两个检测目标；换任务时只替换配置和 Stage 1 source memory，不修改 pipeline 代码。
+没有可用的 Grounding-DINO/SAM2 权重时脚本会直接报错，不会悄悄改用人工分割。SAM2 在 `--sam2-python` 指定的独立 conda 环境中作为子进程运行，主环境不需要安装 `iopath`。`perception-config` 中的 `objects.affordance.prompt` 和 `objects.target.prompt` 分别控制两个检测目标；换任务时只替换配置和 Stage 1 source memory，不修改 pipeline 代码。
+
+若 RGB-D 掩码内部存在明显深度断层，FGW 的原有局部图可能无法连通。默认仍严格使用迁移配置中的阈值；只有在确认是传感器深度断层时，才可以显式传入已有参数覆盖，例如 `--fgw-edge-length-ratio 12`，该值会写入报告，便于复现实验。
 
 ## 输出
 
