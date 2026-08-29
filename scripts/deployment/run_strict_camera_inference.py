@@ -23,6 +23,7 @@ from PIL import Image
 
 from lfv.affordance_transfer.app import run_transfer
 from lfv.deployment.model_backend import FunctionalMotionDirectBackend
+from lfv.deployment.rgbd_alignment import align_depth_to_rgb
 from lfv.deployment.partial_grasp import build_contact_pair_hypotheses
 from lfv.inference.functional_motion.two_stage_pouring import sample_heat_point_cloud, sample_mask_point_cloud
 from lfv.pipeline.dino_bbox import _load_model as load_grounding_dino, get_object_bbox
@@ -112,16 +113,19 @@ def main() -> int:
     p.add_argument("--sam2-device", default="cpu")
     p.add_argument("--device", default="cpu", help="shared perception/Stage1 device")
     p.add_argument("--stage2-device", default="cpu")
-    p.add_argument("--stage2-checkpoint", type=Path, default=Path("/home/users1/ljian/lfv_runs/stage2/ablation_stage_aware/a3b_gated_phase_tokens/checkpoints/best.pt"))
+    p.add_argument("--stage2-checkpoint", type=Path, default=Path("/home/users1/ljian/lfv_runs/stage2/motion_functional_field/v2_joint/checkpoints/best.pt"))
     p.add_argument("--dino-weights", type=Path, default=Path("/home/users1/ljian/LFV/third_party/dinov2_weights/dinov2_vits14_pretrain.pth"))
     p.add_argument("--fgw-edge-length-ratio", type=float, default=None, help="Optional existing FGW graph threshold override for depth-discontinuous RGB-D masks")
+    p.add_argument("--motion-memory", type=Path, default=None, help="Optional Stage 2 motion-field memory .npz")
+    p.add_argument("--motion-field-prior-weight", type=float, default=0.5)
     p.add_argument("--skip-stage2", action="store_true")
     args = p.parse_args()
     root = args.input_dir.expanduser().resolve(); out = (args.output_dir or root.parent / "strict_inference").expanduser().resolve(); out.mkdir(parents=True, exist_ok=True)
     rgb_path, depth_path = _find_images(root)
     rgb = np.asarray(Image.open(rgb_path).convert("RGB"), dtype=np.uint8)
     k, depth_scale = _camera_intrinsics(root / "intrinsics.yaml")
-    depth = np.asarray(Image.open(depth_path), dtype=np.float32) * depth_scale
+    depth_raw = np.asarray(Image.open(depth_path), dtype=np.float32) * depth_scale
+    depth, k, alignment_report = align_depth_to_rgb(rgb, depth_raw, k)
 
     # Existing Grounding-DINO implementation and task prompts.
     perception_cfg = load_config(args.perception_config)
@@ -170,9 +174,11 @@ def main() -> int:
         raise RuntimeError("No top-down contact pair was found in the transferred 256-point heat cloud")
     selected = hypotheses[0]
     trajectory = None
+    motion_metadata: dict[str, object] = {}
     if not args.skip_stage2:
-        motion = FunctionalMotionDirectBackend(checkpoint=args.stage2_checkpoint, dino_weights=args.dino_weights, device=args.stage2_device, seed=42, num_goals=1, num_trajectories=1)
+        motion = FunctionalMotionDirectBackend(checkpoint=args.stage2_checkpoint, dino_weights=args.dino_weights, device=args.stage2_device, seed=42, num_goals=1, num_trajectories=1, motion_memory=args.motion_memory, motion_field_prior_weight=args.motion_field_prior_weight, fgw_edge_length_ratio=float(transfer_cfg.get("fgw", {}).get("edge_length_ratio", 4.0)))
         pred = motion.predict(workdir=out / "stage2_motion", rgb=rgb, depth_m=depth, cup_mask=masks["cup"], bowl_mask=masks["bowl"], intrinsic_cv=k, heatmap=heat)
+        motion_metadata = pred.metadata
         trajectory = np.asarray(pred.object_trajectory_camera, dtype=np.float32)
         attachment = np.linalg.inv(pred.goal_camera) @ selected.tcp_camera
         tcp_trajectory = trajectory @ attachment
@@ -182,7 +188,7 @@ def main() -> int:
     save_partial_grasp_overlay(rgb, k, heat, masks["cup"], selected.first_contact_camera, selected.second_contact_camera, selected.tcp_camera, out / "inference_overlay.png", title="Strict DINO+SAM2+AffCorrs/FGW+Stage2", trajectory_camera=tcp_trajectory)
     save_contact_pair_ply(points256, heat256, selected.first_contact_camera, selected.second_contact_camera, selected.tcp_camera, out / "camera_grasp_trajectory.ply", trajectory_camera=tcp_trajectory)
     np.savez_compressed(out / "camera_plan.npz", tcp_camera=selected.tcp_camera, first_contact_camera=selected.first_contact_camera, second_contact_camera=selected.second_contact_camera, object_trajectory_camera=np.empty((0, 4, 4), np.float32) if trajectory is None else trajectory, tcp_trajectory_camera=np.empty((0, 4, 4), np.float32) if tcp_trajectory is None else tcp_trajectory, manipulated_points_stage1=points256, manipulated_pixels_stage1=pixels256, manipulated_heat_stage1=heat256, target_points_stage1=target256, target_pixels_stage1=target_pixels256, intrinsic_cv=k)
-    report = {"input_rgb": str(rgb_path), "input_depth": str(depth_path), "detector": {"implementation": "lfv.pipeline.dino_bbox Grounding-DINO", "prompts": prompts, "boxes": {k: v.tolist() for k, v in boxes.items()}}, "segmenter": {"implementation": "lfv.pipeline.sam2_mask SAM2", "scores": sam_scores, "checkpoint": str(perception_cfg.sam2.checkpoint)}, "stage1": {"implementation": "run_transfer + AffCorrsFGWContactTransferPipeline", "source": transfer_cfg["source"], "accepted": bool(transfer_run["result"].accepted), "confidence": transfer_run["result"].confidence, "fgw_edge_length_ratio": transfer_cfg.get("fgw", {}).get("edge_length_ratio")}, "sampling": {"stage1_manipulated": list(points256.shape), "stage1_target": list(target256.shape), "stage2_manipulated": [256, 3], "stage2_target": [256, 3], "trajectory": [64, 9], "implementation": "lfv.inference.functional_motion.two_stage_pouring"}, "grasp": selected.as_dict(), "trajectory_steps": 0 if trajectory is None else int(len(trajectory)), "output_dir": str(out)}
+    report = {"input_rgb": str(rgb_path), "input_depth": str(depth_path), "rgbd_alignment": alignment_report, "detector": {"implementation": "lfv.pipeline.dino_bbox Grounding-DINO", "prompts": prompts, "boxes": {k: v.tolist() for k, v in boxes.items()}}, "segmenter": {"implementation": "lfv.pipeline.sam2_mask SAM2", "scores": sam_scores, "checkpoint": str(perception_cfg.sam2.checkpoint)}, "stage1": {"implementation": "run_transfer + AffCorrsFGWContactTransferPipeline", "source": transfer_cfg["source"], "accepted": bool(transfer_run["result"].accepted), "confidence": transfer_run["result"].confidence, "fgw_edge_length_ratio": transfer_cfg.get("fgw", {}).get("edge_length_ratio")}, "stage2": {"motion_memory": None if args.motion_memory is None else str(args.motion_memory), "motion_field_prior_weight": args.motion_field_prior_weight, "backend": motion_metadata}, "sampling": {"stage1_manipulated": list(points256.shape), "stage1_target": list(target256.shape), "stage2_manipulated": [256, 3], "stage2_target": [256, 3], "trajectory": [64, 9], "implementation": "lfv.inference.functional_motion.two_stage_pouring"}, "grasp": selected.as_dict(), "trajectory_steps": 0 if trajectory is None else int(len(trajectory)), "output_dir": str(out)}
     (out / "strict_inference_report.json").write_text(json.dumps(report, indent=2, ensure_ascii=False, default=lambda x: None), encoding="utf-8")
     print(json.dumps({"output": str(out), "stage1_accepted": report["stage1"]["accepted"], "trajectory_steps": report["trajectory_steps"], "files": ["detection_segmentation_overlay.png", "stage1_transfer/transfer_summary.png", "inference_overlay.png", "camera_plan.npz", "camera_grasp_trajectory.ply", "strict_inference_report.json"]}, ensure_ascii=False, indent=2))
     return 0

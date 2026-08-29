@@ -104,6 +104,8 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         *,
         return_debug: bool = False,
         motion_field_intervention: str | None = None,
+        motion_field_prior: tuple[torch.Tensor | None, torch.Tensor | None] | None = None,
+        motion_field_prior_weight: float = 0.0,
     ) -> ContextEncoding:
         return self.encoder(
             batch["manipulated_points"],
@@ -112,6 +114,8 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             batch["reference_dino"],
             return_debug=return_debug,
             motion_field_intervention=motion_field_intervention,
+            motion_field_prior=motion_field_prior,
+            motion_field_prior_weight=motion_field_prior_weight,
         )
 
     def compute_loss(self, batch: dict, stage: str = "joint") -> dict[str, torch.Tensor]:
@@ -179,11 +183,15 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         goal_inference_steps: int | None = None,
         trajectory_inference_steps: int | None = None,
         motion_field_intervention: str | None = None,
+        motion_field_prior: tuple[torch.Tensor | None, torch.Tensor | None] | None = None,
+        motion_field_prior_weight: float = 0.0,
     ) -> tuple[Stage2Samples, ContextEncoding]:
         encoding = self.encode(
             batch,
             return_debug=return_debug,
             motion_field_intervention=motion_field_intervention,
+            motion_field_prior=motion_field_prior,
+            motion_field_prior_weight=motion_field_prior_weight,
         )
         goals = self.goal_diffuser.sample(
             encoding.tokens,

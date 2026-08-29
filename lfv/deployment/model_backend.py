@@ -103,11 +103,15 @@ class FunctionalMotionDirectBackend:
     is involved.
     """
 
-    def __init__(self, *, checkpoint: str, dino_weights: str, device: str = "cpu", seed: int = 42, num_goals: int = 1, num_trajectories: int = 1):
+    def __init__(self, *, checkpoint: str, dino_weights: str, device: str = "cpu", seed: int = 42, num_goals: int = 1, num_trajectories: int = 1, motion_memory: str | None = None, motion_field_prior_weight: float = 0.5, fgw_alpha: float = 0.5, fgw_edge_length_ratio: float = 4.0):
         self.checkpoint = Path(checkpoint).expanduser()
         self.dino_weights = Path(dino_weights).expanduser()
         self.device = device
         self.seed, self.num_goals, self.num_trajectories = int(seed), int(num_goals), int(num_trajectories)
+        self.motion_memory = Path(motion_memory).expanduser() if motion_memory else None
+        self.motion_field_prior_weight = float(motion_field_prior_weight)
+        self.fgw_alpha = float(fgw_alpha)
+        self.fgw_edge_length_ratio = float(fgw_edge_length_ratio)
 
     def predict(self, *, workdir: str | Path, rgb: np.ndarray, depth_m: np.ndarray, cup_mask: np.ndarray, bowl_mask: np.ndarray, intrinsic_cv: np.ndarray, heatmap: np.ndarray) -> MotionPrediction:
         import torch
@@ -116,6 +120,8 @@ class FunctionalMotionDirectBackend:
         from lfv.geometry import local_delta_to_camera, pose9d_to_matrix_np
         from lfv.inference.functional_motion.two_stage import localize_clouds, sample_heat_point_cloud, sample_mask_point_cloud
         from lfv.models.functional_motion_generation import load_stage2_checkpoint
+        from lfv.models.functional_motion_generation.motion_field_transfer import MotionFieldMemory, transport_motion_field
+        from lfv.visualization.motion_field import save_motion_field_comparison
 
         workdir = Path(workdir); workdir.mkdir(parents=True, exist_ok=True)
         device = torch.device(self.device)
@@ -133,10 +139,26 @@ class FunctionalMotionDirectBackend:
             feat = torch.from_numpy(grid).permute(2, 0, 1)[None].to(device)
             sampled = F.grid_sample(feat, torch.from_numpy(coords).view(1, len(coords), 1, 2).to(device), mode="bilinear", align_corners=True)
             return F.normalize(sampled.squeeze(0).squeeze(-1).T, dim=-1).cpu().numpy().astype(np.float32)
-        batch = {"manipulated_points": torch.from_numpy(m_local)[None].to(device), "manipulated_dino": torch.from_numpy(sample_features(m_pixels))[None].to(device), "reference_points": torch.from_numpy(r_local)[None].to(device), "reference_dino": torch.from_numpy(sample_features(r_pixels))[None].to(device)}
+        manipulated_dino = sample_features(m_pixels)
+        reference_dino = sample_features(r_pixels)
+        batch = {"manipulated_points": torch.from_numpy(m_local)[None].to(device), "manipulated_dino": torch.from_numpy(manipulated_dino)[None].to(device), "reference_points": torch.from_numpy(r_local)[None].to(device), "reference_dino": torch.from_numpy(reference_dino)[None].to(device)}
+        prior_m = prior_r = None
+        transfer_payload: dict[str, np.ndarray] = {}
+        transfer_confidence = None
+        effective_prior_weight = 0.0
+        if self.motion_memory is not None:
+            memory = MotionFieldMemory.load(self.motion_memory)
+            transfer_m = transport_motion_field(memory.manipulated_points, memory.manipulated_dino, memory.manipulated_field, m_local, manipulated_dino, alpha=self.fgw_alpha, edge_length_ratio=self.fgw_edge_length_ratio)
+            transfer_r = transport_motion_field(memory.reference_points, memory.reference_dino, memory.reference_field, r_local, reference_dino, alpha=self.fgw_alpha, edge_length_ratio=self.fgw_edge_length_ratio)
+            prior_m = torch.from_numpy(transfer_m.target_field)[None].to(device)
+            prior_r = torch.from_numpy(transfer_r.target_field)[None].to(device)
+            transfer_confidence = float(0.5 * (transfer_m.confidence + transfer_r.confidence))
+            effective_prior_weight = float(np.clip(self.motion_field_prior_weight * transfer_confidence, 0.0, 1.0))
+            transfer_payload.update({"manipulated_motion_field_prior": transfer_m.target_field, "reference_motion_field_prior": transfer_r.target_field, "manipulated_transport": transfer_m.transport, "reference_transport": transfer_r.transport})
         generator = torch.Generator(device=device).manual_seed(self.seed)
         with torch.inference_mode():
-            samples, encoding = model.sample(batch, num_goal_samples=self.num_goals, num_trajectory_samples=self.num_trajectories, generator=generator, return_debug=True)
+            online_encoding = model.encode(batch, return_debug=True)
+            samples, encoding = model.sample(batch, num_goal_samples=self.num_goals, num_trajectory_samples=self.num_trajectories, generator=generator, return_debug=True, motion_field_prior=(prior_m, prior_r) if prior_m is not None else None, motion_field_prior_weight=effective_prior_weight)
         goal_local = samples.goals[0, 0].cpu().numpy().astype(np.float32)
         traj_local = samples.trajectories[0, 0, 0].cpu().numpy().astype(np.float32)
         goal = local_delta_to_camera(pose9d_to_matrix_np(goal_local), centroid, 1.0)
@@ -151,7 +173,16 @@ class FunctionalMotionDirectBackend:
         ).astype(np.float32)
         field_path = workdir / "motion_field.npz"
         payload = {}
-        if encoding.manipulated_motion_field is not None: payload["manipulated_motion_field"] = encoding.manipulated_motion_field[0].cpu().numpy()
-        if encoding.reference_motion_field is not None: payload["reference_motion_field"] = encoding.reference_motion_field[0].cpu().numpy()
-        if payload: np.savez_compressed(field_path, **payload)
-        return MotionPrediction(goal.astype(np.float32), trajectory.astype(np.float32), {"backend": "functional_motion_direct", "checkpoint": str(self.checkpoint), "dino_weights": str(self.dino_weights), "stage2_point_count": 256, "motion_field_artifact": str(field_path) if payload else None})
+        if encoding.manipulated_motion_field is not None: payload["manipulated_motion_field_fused"] = encoding.manipulated_motion_field[0].cpu().numpy()
+        if encoding.reference_motion_field is not None: payload["reference_motion_field_fused"] = encoding.reference_motion_field[0].cpu().numpy()
+        payload.update(transfer_payload)
+        if payload:
+            payload.update({"manipulated_points": m_local, "reference_points": r_local, "manipulated_pixels": m_pixels, "reference_pixels": r_pixels})
+            np.savez_compressed(field_path, **payload)
+        if encoding.manipulated_motion_field is not None and encoding.reference_motion_field is not None:
+            manipulated_fused = encoding.manipulated_motion_field[0].cpu().numpy()
+            reference_fused = encoding.reference_motion_field[0].cpu().numpy()
+            online_m = online_encoding.manipulated_motion_field[0].cpu().numpy() if online_encoding.manipulated_motion_field is not None else manipulated_fused
+            online_r = online_encoding.reference_motion_field[0].cpu().numpy() if online_encoding.reference_motion_field is not None else reference_fused
+            save_motion_field_comparison(rgb, m_pixels, r_pixels, online_m, online_r, None if prior_m is None else prior_m[0].cpu().numpy(), None if prior_r is None else prior_r[0].cpu().numpy(), manipulated_fused, reference_fused, workdir / "motion_field_comparison.png")
+        return MotionPrediction(goal.astype(np.float32), trajectory.astype(np.float32), {"backend": "functional_motion_direct", "checkpoint": str(self.checkpoint), "dino_weights": str(self.dino_weights), "stage2_point_count": 256, "motion_memory": None if self.motion_memory is None else str(self.motion_memory), "motion_field_prior_weight": self.motion_field_prior_weight, "effective_motion_field_prior_weight": effective_prior_weight, "motion_field_transfer_confidence": transfer_confidence, "motion_field_artifact": str(field_path) if payload else None, "motion_field_comparison": str(workdir / "motion_field_comparison.png") if encoding.manipulated_motion_field is not None else None})

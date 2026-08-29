@@ -31,6 +31,20 @@ def _intervene_distribution(
     raise ValueError("motion_field_intervention must be None, 'uniform', or 'roll'")
 
 
+def _mix_field(current: torch.Tensor, prior: torch.Tensor, weight: float) -> torch.Tensor:
+    """Fuse two per-point relevance distributions without changing their support."""
+
+    if current.shape != prior.shape:
+        raise ValueError(f"Motion-field prior shape {tuple(prior.shape)} != current {tuple(current.shape)}")
+    prior = prior.to(device=current.device, dtype=current.dtype).clamp_min(0.0)
+    current = current.clamp_min(0.0)
+    current = current / current.sum(dim=1, keepdim=True).clamp_min(1e-8)
+    prior = prior / prior.sum(dim=1, keepdim=True).clamp_min(1e-8)
+    strength = float(max(0.0, min(1.0, weight)))
+    mixed = (1.0 - strength) * current + strength * prior
+    return mixed / mixed.sum(dim=1, keepdim=True).clamp_min(1e-8)
+
+
 @dataclass
 class DirectionalRelationEncoding:
     token: torch.Tensor
@@ -185,6 +199,8 @@ class BidirectionalSceneEncoder(nn.Module):
         *,
         return_debug: bool = False,
         motion_field_intervention: str | None = None,
+        motion_field_prior: tuple[torch.Tensor | None, torch.Tensor | None] | None = None,
+        motion_field_prior_weight: float = 0.0,
     ) -> ContextEncoding:
         manipulated_input = torch.cat(
             (self.manipulated_xyz(manipulated_points), self.dino_projector(manipulated_dino)),
@@ -231,6 +247,11 @@ class BidirectionalSceneEncoder(nn.Module):
             )
             manipulated_field = joint_relation.sum(dim=2)
             reference_field = joint_relation.sum(dim=1)
+            if motion_field_prior is not None and motion_field_prior_weight > 0.0:
+                prior_m, prior_r = motion_field_prior
+                if prior_m is not None and prior_r is not None:
+                    manipulated_field = _mix_field(manipulated_field, prior_m, motion_field_prior_weight)
+                    reference_field = _mix_field(reference_field, prior_r, motion_field_prior_weight)
             manipulated_relation.motion_field = manipulated_field
             reference_relation.motion_field = reference_field
             manipulated_relation.token = torch.sum(
@@ -273,6 +294,27 @@ class BidirectionalSceneEncoder(nn.Module):
                     * reference_relation.points,
                     dim=1,
                 )
+            if (
+                self.motion_field_mode == "independent"
+                and motion_field_prior is not None
+                and motion_field_prior_weight > 0.0
+            ):
+                prior_m, prior_r = motion_field_prior
+                if prior_m is not None and prior_r is not None:
+                    manipulated_relation.motion_field = _mix_field(
+                        manipulated_relation.motion_field, prior_m, motion_field_prior_weight
+                    )
+                    reference_relation.motion_field = _mix_field(
+                        reference_relation.motion_field, prior_r, motion_field_prior_weight
+                    )
+                    manipulated_relation.token = torch.sum(
+                        manipulated_relation.motion_field.unsqueeze(-1) * manipulated_relation.points,
+                        dim=1,
+                    )
+                    reference_relation.token = torch.sum(
+                        reference_relation.motion_field.unsqueeze(-1) * reference_relation.points,
+                        dim=1,
+                    )
             initial = self.initial_fusion(
                 torch.cat((manipulated_global, reference_global), dim=-1)
             )

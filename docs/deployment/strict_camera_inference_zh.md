@@ -13,8 +13,9 @@ RGB-D + intrinsics.yaml
         │    既有 Soft Heatmap AffCorrs + FGW，迁移 hand_pouring_lfv/episode_0 的 Contact Field
         ├─ lfv.inference.functional_motion.two_stage_pouring
         │    既有采样器：操作物体 256 点、参考物体 256 点，并保持点/DINO 对齐
-        ├─ lfv.deployment.model_backend.FunctionalMotionDirectBackend
-        │    当前 Stage 2 joint functional-motion checkpoint（XYZ+DINO、三 token、Goal/Full64）
+├─ lfv.deployment.model_backend.FunctionalMotionDirectBackend
+│    当前 Stage 2 joint functional-motion checkpoint（XYZ+DINO、三 token、Goal/Full64）
+│    可选读取 memory .npz，将源 Motion Field 用 FGW 输运并与在线场融合
         └─ contact-pair grasp instantiation
              top-down、跨接触区域两侧的相机系 TCP 抓取姿态
 ```
@@ -58,11 +59,22 @@ PYTHONPATH=. python scripts/deployment/run_strict_camera_inference.py \
   --sam2-device cuda:0 \
   --stage2-checkpoint /path/to/stage2/best.pt \
   --dino-weights /path/to/dinov2_vits14_pretrain.pth \
+  --motion-memory /path/to/episode_0_motion_memory.npz \
+  --motion-field-prior-weight 0.5 \
   --device cuda:0 \
   --stage2-device cuda:0
 ```
 
 没有可用的 Grounding-DINO/SAM2 权重时脚本会直接报错，不会悄悄改用人工分割。SAM2 在 `--sam2-python` 指定的独立 conda 环境中作为子进程运行，主环境不需要安装 `iopath`。`perception-config` 中的 `objects.affordance.prompt` 和 `objects.target.prompt` 分别控制两个检测目标；换任务时只替换配置和 Stage 1 source memory，不修改 pipeline 代码。
+
+生成 Stage 2 memory（只需在 A100/训练机执行一次）：
+
+```bash
+PYTHONPATH=. python scripts/stage2/build_motion_field_memory.py \
+  --artifact /path/to/cache/episodes/episode_0.npz \
+  --checkpoint /path/to/motion_field_checkpoint/best.pt \
+  --output /path/to/memory/episode_0_motion_memory.npz
+```
 
 若 RGB-D 掩码内部存在明显深度断层，FGW 的原有局部图可能无法连通。默认仍严格使用迁移配置中的阈值；只有在确认是传感器深度断层时，才可以显式传入已有参数覆盖，例如 `--fgw-edge-length-ratio 12`，该值会写入报告，便于复现实验。
 
@@ -98,7 +110,9 @@ inference/
 
 `motion_field.npz` 保存 Stage 2 encoder 输出的操作物体/参考物体 motion field，便于检查功能区域是否集中。PNG 和 PLY 用于人工复核，不直接控制机械臂。
 
-需要区分两个“迁移”：本入口中的 Stage 1 `run_transfer` 明确迁移的是源示范的 Contact Field；Stage 2 checkpoint 中的 Motion Functional Field 则由其 relevance head 根据当前目标的 XYZ–DINO 在线预测并保存。当前仓库没有一个独立的“源 Motion Field→目标 Motion Field”FGW 接口，因此这里不会把 Contact 迁移结果误称为运动场迁移，也不会人为拼接一个不存在的先验。
+Stage 2 现在支持可选的 motion memory：`scripts/stage2/build_motion_field_memory.py` 从一个缓存 episode 和 motion-field checkpoint 导出源 XYZ、DINO 和 relevance field；推理时用同一 FGW 结构/语义输运算子把两部分源场传到当前 256 点云，再按 `motion-field-prior-weight` 与当前 relevance head 的在线场融合，融合后的三 token 继续进入原有 Goal/Full64 diffusion。`motion_field_comparison.png` 对比 online、memory prior 和 fused 三种场。
+
+需要区分两个“迁移”：Stage 1 `run_transfer` 迁移的是源示范 Contact Field；Stage 2 memory 迁移的是训练后导出的 Motion Functional Field。两者均复用 FGW，但场的来源和用途不同。
 
 ## 机器人电脑如何使用
 
