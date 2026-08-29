@@ -86,6 +86,11 @@ def main() -> int:
     p.add_argument("--sam2-root", type=Path, default=Path("/home/users1/ljian/sam2"))
     p.add_argument("--device", default="cpu", help="shared perception/Stage1 device")
     p.add_argument("--stage2-device", default="cpu")
+    p.add_argument("--model-repo", type=Path, default=Path("/home/users1/ljian/object_centric_diffusion"))
+    p.add_argument("--goal-checkpoint", type=Path, default=Path("/home/users1/ljian/object_centric_diffusion/data/outputs_local_goal_pose/pouring_seed42/20260428_171300/checkpoints/epoch=0700-val_sample_goal_pos_err_cm=3.086.ckpt"))
+    p.add_argument("--trajectory-checkpoint", type=Path, default=Path("/home/users1/ljian/object_centric_diffusion/data/outputs_goal_full64/pouring_seed42/20260429_210924/checkpoints/epoch=1500.ckpt"))
+    p.add_argument("--language-embedding", type=Path, default=Path("/media/ljian/lj/data_3d/pouring/lang_emb.npy"))
+    p.add_argument("--model-python", default="/home/users1/ljian/anaconda3/envs/sam3d-objects/bin/python")
     p.add_argument("--skip-stage2", action="store_true")
     args = p.parse_args()
     root = args.input_dir.expanduser().resolve(); out = (args.output_dir or root.parent / "strict_inference").expanduser().resolve(); out.mkdir(parents=True, exist_ok=True)
@@ -138,7 +143,7 @@ def main() -> int:
     selected = hypotheses[0]
     trajectory = None
     if not args.skip_stage2:
-        motion = LegacyPouringBackend(model_repo="/home/users1/ljian/object_centric_diffusion", goal_checkpoint="/home/users1/ljian/object_centric_diffusion/data/outputs_local_goal_pose/pouring_seed42/20260428_171300/checkpoints/epoch=0700-val_sample_goal_pos_err_cm=3.086.ckpt", trajectory_checkpoint="/home/users1/ljian/object_centric_diffusion/data/outputs_goal_full64/pouring_seed42/20260429_210924/checkpoints/epoch=1500.ckpt", language_embedding="/media/ljian/lj/data_3d/pouring/lang_emb.npy", python_executable="/home/users1/ljian/anaconda3/envs/sam3d-objects/bin/python", seed=42, device=args.stage2_device)
+        motion = LegacyPouringBackend(model_repo=args.model_repo, goal_checkpoint=args.goal_checkpoint, trajectory_checkpoint=args.trajectory_checkpoint, language_embedding=args.language_embedding, python_executable=args.model_python, seed=42, device=args.stage2_device)
         pred = motion.predict(workdir=out / "stage2_motion", rgb=rgb, depth_m=depth, cup_mask=masks["cup"], bowl_mask=masks["bowl"], intrinsic_cv=k, heatmap=heat)
         trajectory = np.asarray(pred.object_trajectory_camera, dtype=np.float32)
         attachment = np.linalg.inv(pred.goal_camera) @ selected.tcp_camera

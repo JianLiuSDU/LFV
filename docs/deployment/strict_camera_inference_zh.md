@@ -62,7 +62,12 @@ scripts/deployment/run_strict_camera_inference.py \
   --input-dir /home/users1/ljian/LFV_ex/cup_pouring/ex_1/input \
   --output-dir /home/users1/ljian/LFV_ex/cup_pouring/ex_1/strict_inference \
   --device cpu \
-  --stage2-device cpu
+  --stage2-device cpu \
+  --model-repo /path/to/object_centric_diffusion \
+  --goal-checkpoint /path/to/goal.ckpt \
+  --trajectory-checkpoint /path/to/trajectory.ckpt \
+  --language-embedding /path/to/lang_emb.npy \
+  --model-python /path/to/python
 ```
 
 有 GPU 时可分别改成 `--device cuda:0 --stage2-device cuda:0`。脚本会自动读取：
@@ -120,4 +125,3 @@ T_robot_tcp = T_robot_camera · T_camera_tcp
 * 将 Stage 2 checkpoint 和 `lang_emb.npy` 改为新电脑路径。
 
 推理算法本身不需要改动。若新机械臂使用 Aubo，只需在执行端把相机坐标系轨迹转换为 Aubo 基座坐标系，并实现 Aubo 的 IK/轨迹发送接口。
-
