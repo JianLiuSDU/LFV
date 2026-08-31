@@ -20,7 +20,7 @@ target RGB + target mask + target continuous heat + confidence
 `method: affcorrs_fgw` 时，AffCorrs 只负责语义区域，完整源/目标功能部件 RGB-D
 经 FPS、kNN 测地距离和 balanced FGW 迁移部件内部 Contact Field。旧
 `soft_heatmap_affcorrs` 仍然完全不读深度；两种方法由同一入口和配置分发，详见
-`docs/affcorrs_fgw_contact_transfer_zh.md`。
+`docs/stage1_affcorrs_fgw_contact_transfer_zh.md`。
 
 目标是确认“人类演示中接触的语义部件能否迁移到同类别仿真实例的相机
 图像”。这一阶段不训练 Joint Contact–Grasp Diffusion，也不从单视角手部关键点
@@ -454,12 +454,12 @@ test_pouring_motion_execution_geometry.py
 它固定执行：二维迁移 → 逐像素反投影 → 完整表面反平行点对传播 → GraspNet
 解码 → top-down 点对细化 → 标准和严格分部碰撞筛选 → Open3D/Xvfb 与四联图。
 完整公式、坐标系、阈值、当前真实结果和输出契约见
-`docs/transferred_heat_topdown_grasp_zh.md`。
+`docs/stage1_affcorrs_fgw_contact_transfer_zh.md`。
 
 `snapshot_export` 是可选配置层：YCB 资产可按 model id 加载，自定义扫描杯使用
 visual mesh 加若干 convex collision mesh。当前受控新实例回归为
 `Cole_Hardware_Mug_Classic_Blue`，结果与对比入口见
-`docs/cole_blue_mug_generalization_validation_zh.md`。
+运行报告保存在对应的 `lfv_runs` 输出目录中。
 
 ## 11. 后续接入规则
 
@@ -487,7 +487,7 @@ visual mesh 加若干 convex collision mesh。当前受控新实例回归为
 ```
 
 模型选择、256/64 点真实 shape、坐标变换、30 cm 场景、视频产物、首次失败结果
-及后续改进边界完整记录在 `docs/pouring_motion_execution_baseline_zh.md`。执行器已
+及执行边界记录在部署文档中。执行器已
 明确固定 Panda 组合动作的混合单位：arm 是未归一化绝对位姿，gripper 是归一化
 标量 `+1=全开/-1=全闭`；同时逐帧同步保存斜前方和正前方 `base_camera` 两条录像。
 机器人资产层新增可选 `panda_long_finger`：由
@@ -500,4 +500,4 @@ drawer v2 复用同一执行接口，但使用 `panda_drawer_finger`（16×70×4
 手指轴额外下移 30 mm）与 `approach_gripper_action=0.0` 的约 30 mm 预成形开口，
 从上方进入把手前后间隙后才发送 `-1.0` 完全闭合。场景固定为 table-front
 `base_camera`、drawer yaw=0、世界 +X 开启轴；配置、接触对硬约束与成功录像见
-`docs/drawer_open_end_to_end_zh.md`。
+具体历史录像不属于当前活动文档。

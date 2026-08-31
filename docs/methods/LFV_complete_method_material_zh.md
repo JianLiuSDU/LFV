@@ -905,69 +905,16 @@ Best-of-K 和任务成功率。
 
 ---
 
-## 10. 之前已经生成过的方法相关文档
+## 10. 当前文档入口
 
-以下文档已经存在于仓库中。它们分别记录了某个阶段、某次实验或某个网络版本；本
-文档是对这些内容的统一方法总览，不替代它们的实验日志和实现审计。
+为避免历史实验记录和重复设计造成歧义，当前只维护以下入口：
 
-### Stage 1 / Contact Field
-
-- [`docs/stage1_affcorrs_fgw_contact_transfer_zh.md`](../stage1_affcorrs_fgw_contact_transfer_zh.md)：
-  Stage 1 完成版，详细记录 Soft Heatmap AffCorrs、FGW、参数、输出和双任务验证。
-- [`docs/stage1_cross_instance_transfer_operator_material_zh.md`](../stage1_cross_instance_transfer_operator_material_zh.md)：
-  跨实例迁移算子的论文写作材料，包含完整公式、参考文献和表述边界。
-- [`docs/affcorrs_fgw_contact_transfer_zh.md`](../affcorrs_fgw_contact_transfer_zh.md)：
-  AffCorrs + FGW Contact 迁移方法的早期/独立说明。
-- [`docs/soft_heatmap_affcorrs_refactor_plan_zh.md`](../soft_heatmap_affcorrs_refactor_plan_zh.md)：
-  Soft Heatmap AffCorrs 重构计划与模块设计。
-- [`docs/contact_field_data_processing_plan.md`](../contact_field_data_processing_plan.md)：
-  Contact Field 数据构造和处理计划。
-- [`docs/hand_pouring_dino_sam_processing.md`](../hand_pouring_dino_sam_processing.md)：
-  倒水数据中的 DINO、SAM 和手部接触信息处理记录。
-
-### Stage 2 / Goal 与 Trajectory
-
-- [`docs/stage2/current_goal_and_trajectory_pipeline_zh.md`](../stage2/current_goal_and_trajectory_pipeline_zh.md)：
-  当前 Goal/Trajectory 数据、标签、归一化、训练和推理流程。
-- [`docs/stage2/current_method_complete_zh.md`](../stage2/current_method_complete_zh.md)：
-  Stage 2 方法完整说明的一个版本。
-- [`docs/stage2/final_implementation_pipeline_zh.md`](../stage2/final_implementation_pipeline_zh.md)：
-  Stage 2 最终实现流程和代码映射。
-- [`docs/stage2/unified_scene_goal_trajectory_transformer_design_zh.md`](../stage2/unified_scene_goal_trajectory_transformer_design_zh.md)：
-  双对象 XYZ–DINO Encoder、双向关系和三个 Context Token 的设计。
-- [`docs/stage2/joint_encoder_and_stage_aware_trajectory_transformer_zh.md`](../stage2/joint_encoder_and_stage_aware_trajectory_transformer_zh.md)：
-  共享 Encoder 与阶段感知轨迹 Transformer 的设计讨论。
-- [`docs/stage2/research_review_and_architecture_assessment_zh.md`](../stage2/research_review_and_architecture_assessment_zh.md)：
-  Stage 2 相关工作调研、当前方法评价和网络结构问题分析。
-- [`docs/stage2/trajectory_diffusion_smooth_arc_failure_analysis_zh.md`](../stage2/trajectory_diffusion_smooth_arc_failure_analysis_zh.md)：
-  轨迹倾向平滑弧线、时间编码和扩散轨迹问题分析。
-- [`docs/stage2/goal_motion_field_improvement_zh.md`](../stage2/goal_motion_field_improvement_zh.md)：
-  Goal 精度和 Motion Field 改进方案及实验记录。
-- [`docs/stage2/motion_field_gradient_ablation_zh.md`](../stage2/motion_field_gradient_ablation_zh.md)：
-  只让 Goal 或同时让 Goal/Trajectory 更新功能场的梯度消融。
-- [`docs/stage2/motion_functional_field_iteration_log_zh.md`](../stage2/motion_functional_field_iteration_log_zh.md)：
-  Motion Functional Field 网络迭代记录。
-- [`docs/stage2/stage_aware_trajectory_ablation_results_zh.md`](../stage2/stage_aware_trajectory_ablation_results_zh.md)：
-  轨迹阶段建模和时间结构消融结果。
-- [`docs/stage2/implementation_data_audit_and_training_plan_zh.md`](../stage2/implementation_data_audit_and_training_plan_zh.md)：
-  Stage 2 数据审查、采样修正和训练计划。
-- [`docs/stage2/a3b_dataset_controlled_comparison_zh.md`](../stage2/a3b_dataset_controlled_comparison_zh.md)：
-  A3b 模型与数据集控制变量比较。
-- [`docs/stage2/red_mug_pouring_lfv_a3b_run_zh.md`](../stage2/red_mug_pouring_lfv_a3b_run_zh.md)：
-  红色杯子倒水场景的 A3b 推理记录。
-
-### 项目总体和执行后端
-
-- [`docs/project_architecture_and_development_guide_zh.md`](../project_architecture_and_development_guide_zh.md)：
-  LFV 项目结构、模块接口和开发约定。
-- [`docs/transferred_heat_topdown_grasp_zh.md`](../transferred_heat_topdown_grasp_zh.md)：
-  Contact 热力引导的 top-down 抓取生成和可视化。
-- [`docs/pouring_motion_execution_baseline_zh.md`](../pouring_motion_execution_baseline_zh.md)：
-  倒水运动执行基线。
-- [`docs/drawer_open_end_to_end_zh.md`](../drawer_open_end_to_end_zh.md)：
-  拉抽屉端到端流程和执行记录。
-- [`docs/cole_blue_mug_generalization_validation_zh.md`](../cole_blue_mug_generalization_validation_zh.md)：
-  蓝色杯子跨实例/场景验证记录。
+- [`docs/README_zh.md`](../README_zh.md)：文档索引与阅读顺序；
+- [`docs/project_architecture_and_development_guide_zh.md`](../project_architecture_and_development_guide_zh.md)：代码结构与开发约束；
+- [`docs/stage1_affcorrs_fgw_contact_transfer_zh.md`](../stage1_affcorrs_fgw_contact_transfer_zh.md)：Stage 1 接触迁移；
+- [`docs/stage2/current_method_complete_zh.md`](../stage2/current_method_complete_zh.md)：Stage 2 运动生成；
+- [`docs/deployment/strict_camera_inference_zh.md`](../deployment/strict_camera_inference_zh.md)：RGB-D 推理入口；
+- [`docs/deployment/aubo_camera_execution_bundle_zh.md`](../deployment/aubo_camera_execution_bundle_zh.md)：机器人执行交付。
 
 ---
 

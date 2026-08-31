@@ -13,11 +13,12 @@ LFV 当前包含两个通过保存文件解耦的阶段：
 另有一个通过保存文件消费前两阶段结果的动态验证层：加载历史训练完成的 pouring
 GoalPose/Full64 模型，把杯子轨迹转换成 Panda TCP 轨迹，在 ManiSkill 中执行并保存
 MP4、关键帧和分阶段诊断。首条 30 cm 杯碗间距基线见
-`docs/pouring_motion_execution_baseline_zh.md`。
+`docs/deployment/aubo_camera_execution_bundle_zh.md`。
 
 同一套配置驱动流程现已扩展到 drawer open：真实数据隔离、接触热力提取、
 Soft Heatmap AffCorrs、完整把手抓取、Goal Pose/Full64 训练、64 坐标系叠加和
-双视角仿真执行的完整契约见 `docs/drawer_open_end_to_end_zh.md`。
+当前活动文档只维护 pouring 主流程和通用部署接口；drawer 等历史实验记录不再作为
+当前实现的规范。
 
 执行层支持 `panda_long_finger`：保留原 Panda 平行关节、80 mm 开口和 TCP，在两
 个指 link 上加入 30×70 mm 高摩擦长指接触面。相同抓取和 Full64 轨迹已经从
@@ -116,7 +117,7 @@ path 的点云碰撞 IoU 均为 `0`。这里验证的是静态点云碰撞，不
 新实例迁移置信度为 `0.4399`，热力正确位于左侧把手；最终抓取倾角为 `3.29°`，
 接触对宽度 `23.89 mm`，所有分部碰撞 IoU 为 `0`。固定实例对比由
 `scripts/sim/compare_topdown_grasp_instances.py` 生成，完整结论和局限见
-`docs/cole_blue_mug_generalization_validation_zh.md`。
+`docs/stage1_affcorrs_fgw_contact_transfer_zh.md`。
 
 ## 测试
 
@@ -167,21 +168,14 @@ Open3D 可视化已经退出活动代码；当前下游使用的是重新建立�
 
 ## 文档
 
-- `docs/stage1_affcorrs_fgw_contact_transfer_zh.md`：Stage 1 完成版权威文档，详细
-  对照原版 AffCorrs、Soft Heatmap 改造、FGW 结构输运、接口、公式和验收结果；
-- `docs/soft_heatmap_affcorrs_refactor_plan_zh.md`：方法公式、实现结构、接口、
-  置信度、测试、删除记录和后续边界；
-- `docs/affcorrs_fgw_contact_transfer_zh.md`：AffCorrs/FGW 分工、RGB-D/点云契约、
-  双任务 A/B 热力与 GraspNet 验证；
-- `docs/project_architecture_and_development_guide_zh.md`：当前仓库结构与快速
-  迭代开发约束；
-- `docs/transferred_heat_topdown_grasp_zh.md`：二维热力提升、完整表面传播、
-  top-down GraspNet、严格碰撞、坐标系和固定产物；
-- `docs/cole_blue_mug_generalization_validation_zh.md`：新扫描杯受控同类别泛化
-  对比、复现命令、定量结果与局限；
-- `docs/hand_pouring_dino_sam_processing.md`：源数据 DINO/SAM 预处理背景。
-- `docs/drawer_open_end_to_end_zh.md`：drawer 数据隔离、各阶段计算、配置复用、
-  相机尺度修复、训练/推理/执行接口和固定产物。
+当前文档索引和推荐阅读顺序见 [`docs/README_zh.md`](docs/README_zh.md)。核心文档为：
+
+- `docs/project_architecture_and_development_guide_zh.md`：代码结构与迭代约束；
+- `docs/methods/LFV_complete_method_material_zh.md`：完整方法计算材料；
+- `docs/stage1_affcorrs_fgw_contact_transfer_zh.md`：Stage 1 接触场迁移；
+- `docs/stage2/current_method_complete_zh.md`：Stage 2 运动场和分层扩散；
+- `docs/deployment/strict_camera_inference_zh.md`：RGB-D 严格推理入口；
+- `docs/deployment/aubo_camera_execution_bundle_zh.md`：Aubo 实机交付和执行。
 
 ## 可复现性约束
 
