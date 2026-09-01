@@ -174,6 +174,7 @@ Open3D 可视化已经退出活动代码；当前下游使用的是重新建立�
 - `docs/methods/LFV_complete_method_material_zh.md`：完整方法计算材料；
 - `docs/stage1_affcorrs_fgw_contact_transfer_zh.md`：Stage 1 接触场迁移；
 - `docs/stage2/current_method_complete_zh.md`：Stage 2 运动场和分层扩散；
+- `docs/stage2/motion_field_cross_instance_upgrade_plan_zh.md`：跨实例场稳定性、融合和杯口评估计划；
 - `docs/deployment/strict_camera_inference_zh.md`：RGB-D 严格推理入口；
 - `docs/deployment/aubo_camera_execution_bundle_zh.md`：Aubo 实机交付和执行。
 

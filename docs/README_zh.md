@@ -8,8 +8,8 @@
 2. [完整方法材料](methods/LFV_complete_method_material_zh.md)：论文方法所需的完整计算流程和模块说明。
 3. [Stage 1：AffCorrs + FGW Contact 迁移](stage1_affcorrs_fgw_contact_transfer_zh.md)：接触热力的来源、迁移算子和输出契约。
 4. [Stage 2：当前方法](stage2/current_method_complete_zh.md)：Motion Field、Goal/Trajectory diffusion、训练和推理。
-5. [严格相机推理](deployment/strict_camera_inference_zh.md)：RGB-D 到 `camera_plan.npz` 的正式入口。
-6. [Aubo 执行交付](deployment/aubo_camera_execution_bundle_zh.md)：手眼变换、执行包和机器人端接入方法。
+5. [Stage 2：跨实例场与融合改造计划](stage2/motion_field_cross_instance_upgrade_plan_zh.md)：Field 因果性、Prior–Evidence Fusion、多杯子仿真和杯口成功判据。
+6. [严格相机推理](deployment/strict_camera_inference_zh.md)：RGB-D 到 `camera_plan.npz` 的正式入口。
+7. [Aubo 执行交付](deployment/aubo_camera_execution_bundle_zh.md)：手眼变换、执行包和机器人端接入方法。
 
 实验输出、checkpoint、数据集和运行录像不属于版本化文档，保留在各自的运行目录中。
-
