@@ -1,6 +1,8 @@
 # Stage 2：稳定 Motion Functional Field 与跨实例融合改造计划
 
-状态：计划，尚未修改代码。
+状态：计划已执行 P0--P2 的网络、反事实场干预和初步 FGW 融合；定量结果与未完成的
+跨实例/仿真验收见 `motion_field_causal_upgrade_results_zh.md`。本文保留为验收计划，
+不替代实际结果记录。
 
 本计划针对当前模型的两个理论缺口：第一，relevance head 目前只通过 Goal/Trajectory
 denoising loss 间接学习，尚不能证明它对应稳定的任务功能区域；第二，FGW 迁移的
