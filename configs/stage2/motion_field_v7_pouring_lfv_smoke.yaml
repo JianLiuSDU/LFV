@@ -38,6 +38,7 @@ data:
   cache_root: /home/users1/ljian/lfv_data_cache/stage2/pouring_lfv_v1
   dino_dim: 384
   shuffle_points: true
+  strict_instance_split: false
   train_limit: 4
   val_limit: 2
 
@@ -63,4 +64,3 @@ training:
 
 paths:
   output_dir: /tmp/lfv_v7_pouring_smoke
-

@@ -53,6 +53,10 @@ data:
   cache_root: /home/users1/ljian/lfv_data_cache/stage2/pouring_lfv_v1
   dino_dim: 384
   shuffle_points: true
+  # Refuse to call an episode split a cross-instance split when the cache has
+  # no true object_instance_id.  The current legacy cache therefore fails
+  # fast until regenerated with instance IDs.
+  strict_instance_split: true
 
 runtime:
   seed: 42
@@ -76,4 +80,3 @@ training:
 
 paths:
   output_dir: /home/users1/ljian/lfv_runs/stage2/motion_functional_field/v7_functional_alignment_pouring_lfv
-

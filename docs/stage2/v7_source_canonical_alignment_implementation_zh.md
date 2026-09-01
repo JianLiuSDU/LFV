@@ -55,6 +55,8 @@ mask。点云、DINO 和 mask 在训练时使用同一个随机 permutation，�
 train/val/test=143/18/18，DINO 维度 384；旧缓存没有独立 visibility mask，也没有可靠
 的 object instance ID（空值会被数据集代码回退为 episode ID）。所以该缓存可以做
 episode-disjoint 训练和 smoke test，但不能声称严格的 cross-instance split。
+`strict_instance_split: true` 会在读取到空 `object_instance_id` 时立即报错；正式
+跨实例实验应先重新生成带实例 ID 的缓存，而不是启用 episode 回退。
 
 对每个角色分别计算 masked 中心和共享 scene scale：
 
@@ -291,4 +293,3 @@ V7 的四项核心验收条件对应代码中的明确边界：
 3. learned/uniform/shuffled 等 intervention 可以在同一 batch/seed 下配对比较；
 4. 目标实例先通过 correspondence 拉回 source support，再复用同一个 source Field 和
    同一个运动生成器，不进行 online/prior 算术融合。
-

@@ -55,6 +55,7 @@ def main() -> int:
             seed=int(config["runtime"]["seed"]),
             limit=data.get("train_limit"),
             consistency_group_fallback=data.get("consistency_group_fallback"),
+            require_instance_id=bool(data.get("strict_instance_split", False)),
         )
         if bool(data.get("overfit_same_as_train", False)):
             val_dataset = train_dataset
@@ -66,6 +67,7 @@ def main() -> int:
                 seed=int(config["runtime"]["seed"]),
                 limit=data.get("val_limit"),
                 consistency_group_fallback=data.get("consistency_group_fallback"),
+                require_instance_id=bool(data.get("strict_instance_split", False)),
             )
         config["data"]["dino_dim"] = train_dataset.dino_dim
         collate_fn = collate_functional_motion

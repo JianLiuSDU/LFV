@@ -23,6 +23,7 @@ class FunctionalMotionDataset(Dataset):
         seed: int = 42,
         limit: int | None = None,
         consistency_group_fallback: str | None = None,
+        require_instance_id: bool = False,
     ) -> None:
         self.root = Path(cache_root)
         self.split = split
@@ -34,6 +35,7 @@ class FunctionalMotionDataset(Dataset):
             if consistency_group_fallback is not None
             else ""
         )
+        self.require_instance_id = bool(require_instance_id)
         manifest = json.loads((self.root / "manifest.json").read_text(encoding="utf-8"))
         split_manifest = json.loads(
             (self.root / "split_manifest.json").read_text(encoding="utf-8")
@@ -58,9 +60,15 @@ class FunctionalMotionDataset(Dataset):
     def __getitem__(self, index: int) -> dict[str, Any]:
         record = self.records[index]
         with np.load(record["artifact"], allow_pickle=False) as data:
-            raw_instance_id = str(data["object_instance_id"])
-            object_instance_id = raw_instance_id or str(data["episode_id"])
-            consistency_group = raw_instance_id or self.consistency_group_fallback or str(data["episode_id"])
+            raw_instance_id = str(data["object_instance_id"]).strip()
+            episode_id = str(data["episode_id"]).strip()
+            if self.require_instance_id and not raw_instance_id:
+                raise ValueError(
+                    "strict_instance_split requires a non-empty object_instance_id; "
+                    f"missing in {record['artifact']} (episode={episode_id})"
+                )
+            object_instance_id = raw_instance_id or episode_id
+            consistency_group = raw_instance_id or self.consistency_group_fallback or episode_id
             num_manipulated = int(data["manipulated_points"].shape[0])
             num_reference = int(data["reference_points"].shape[0])
             sample: dict[str, Any] = {
