@@ -28,6 +28,22 @@ def _intervene_distribution(
                 dims=dimension,
             )
         return output
+    if intervention == "drop_top":
+        # Remove the highest-mass entries and renormalize.  This is used only
+        # as a no-gradient counterfactual probe: if the learned field is
+        # task-relevant, suppressing its peak should increase the denoising
+        # loss relative to the learned distribution.
+        flat = distribution.flatten(1)
+        num_drop = max(1, int(round(0.1 * flat.shape[1])))
+        top_indices = torch.topk(flat, k=num_drop, dim=1).indices
+        output = flat.scatter(
+            1,
+            top_indices,
+            torch.zeros_like(top_indices, dtype=flat.dtype),
+        )
+        return (output / output.sum(dim=1, keepdim=True).clamp_min(1e-8)).reshape_as(
+            distribution
+        )
     raise ValueError("motion_field_intervention must be None, 'uniform', or 'roll'")
 
 

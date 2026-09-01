@@ -36,6 +36,9 @@ def model_kwargs(config: dict, dino_dim: int) -> dict:
         "motion_field_causal_margin": float(
             model.get("motion_field_causal_margin", 0.0)
         ),
+        "motion_field_drop_top_weight": float(
+            model.get("motion_field_drop_top_weight", 0.0)
+        ),
         "motion_field_consistency_weight": float(
             model.get("motion_field_consistency_weight", 0.0)
         ),

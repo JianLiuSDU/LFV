@@ -39,6 +39,7 @@ def test_causal_probe_and_same_instance_consistency_are_finite():
         motion_field_bottleneck=True,
         motion_field_causal_weight=0.1,
         motion_field_causal_margin=0.01,
+        motion_field_drop_top_weight=0.1,
         motion_field_consistency_weight=0.02,
         motion_field_consistency_max_points=16,
         goal_layers=1,
@@ -50,6 +51,7 @@ def test_causal_probe_and_same_instance_consistency_are_finite():
     model.normalizer.fit_tensors([batch["trajectory_pose9d"]])
     losses = model.compute_loss(batch, stage="joint")
     assert "motion_field_causal" in losses
+    assert "motion_field_drop_top_effect" in losses
     assert "motion_field_consistency" in losses
     assert torch.isfinite(losses["motion_field_causal"])
     assert torch.isfinite(losses["motion_field_consistency"])

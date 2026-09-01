@@ -42,6 +42,7 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         motion_field_bottleneck: bool = False,
         motion_field_causal_weight: float = 0.0,
         motion_field_causal_margin: float = 0.0,
+        motion_field_drop_top_weight: float = 0.0,
         motion_field_consistency_weight: float = 0.0,
         motion_field_consistency_temperature: float = 0.1,
         motion_field_consistency_max_points: int = 64,
@@ -85,6 +86,7 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         )
         self.motion_field_causal_weight = float(motion_field_causal_weight)
         self.motion_field_causal_margin = float(motion_field_causal_margin)
+        self.motion_field_drop_top_weight = float(motion_field_drop_top_weight)
         self.motion_field_consistency_weight = float(motion_field_consistency_weight)
         self.motion_field_consistency_temperature = float(
             motion_field_consistency_temperature
@@ -290,7 +292,10 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
         if consistency is not None and self.motion_field_consistency_weight > 0.0:
             losses["motion_field_consistency"] = consistency
             losses["total"] = losses["total"] + self.motion_field_consistency_weight * consistency
-        if self.motion_field_causal_weight > 0.0 and encoding.manipulated_motion_field is not None:
+        if (
+            self.motion_field_causal_weight > 0.0
+            and encoding.manipulated_motion_field is not None
+        ):
             # Re-run the uniform-field intervention with exactly the same
             # dropout/noise/timestep stream, then restore the post-baseline RNG
             # so enabling the probe does not alter the training trajectory.
@@ -298,15 +303,39 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             _restore_rng_state(rng_before)
             uniform_encoding = self.encode(batch, motion_field_intervention="uniform")
             uniform_losses = self._compute_losses_from_encoding(batch, uniform_encoding, stage)
+            drop_top_losses = None
+            if self.motion_field_drop_top_weight > 0.0:
+                _restore_rng_state(rng_before)
+                drop_top_encoding = self.encode(
+                    batch, motion_field_intervention="drop_top"
+                )
+                drop_top_losses = self._compute_losses_from_encoding(
+                    batch, drop_top_encoding, stage
+                )
             _restore_rng_state(baseline_after)
             causal = F.relu(
                 self.motion_field_causal_margin
                 + losses["total"]
-                - uniform_losses["total"]
+                - uniform_losses["total"].detach()
             )
             losses["motion_field_uniform_total"] = uniform_losses["total"].detach()
             losses["motion_field_causal"] = causal
             losses["total"] = losses["total"] + self.motion_field_causal_weight * causal
+            if drop_top_losses is not None:
+                # A useful field must be more than a visualization: suppressing
+                # its highest-mass entries should hurt the task objective.  The
+                # counterfactual target is detached so the model cannot satisfy
+                # the constraint by intentionally worsening the intervention.
+                drop_effect = F.relu(
+                    self.motion_field_causal_margin
+                    + losses["total"]
+                    - drop_top_losses["total"].detach()
+                )
+                losses["motion_field_drop_top_total"] = drop_top_losses[
+                    "total"
+                ].detach()
+                losses["motion_field_drop_top_effect"] = drop_effect
+                losses["total"] = losses["total"] + self.motion_field_drop_top_weight * drop_effect
         return losses
 
     @torch.no_grad()
