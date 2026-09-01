@@ -1,0 +1,65 @@
+# Fast V7 smoke/overfit configuration.  It intentionally uses a smaller
+# hidden size while preserving all V7 module boundaries.
+model:
+  name: v7_functional_alignment
+  motion_field_mode: local_functional_bottleneck
+  hidden_dim: 32
+  encoder_heads: 4
+  local_dino_proj_dim: 16
+  local_object_xyz_dim: 8
+  local_relation_xyz_dim: 8
+  field_selector_layers: 1
+  field_selector_ffn_dim: 64
+  field_selector_dropout: 0.0
+  field_temperature_start: 1.0
+  field_temperature_end: 0.4
+  gated_relation_layers: 1
+  gated_relation_ffn_dim: 64
+  functional_pooling_queries: 2
+  field_target_ratio_start: 0.50
+  field_target_ratio_end: 0.20
+  field_knn: 4
+  field_budget_weight: 0.02
+  field_smooth_weight: 0.01
+  field_consistency_weight: 0.0
+  goal_layers: 1
+  trajectory_layers: 1
+  decoder_heads: 4
+  dropout: 0.0
+  num_train_timesteps: 10
+  goal_inference_steps: 2
+  trajectory_inference_steps: 2
+  trajectory_hard_start_token: true
+  trajectory_position_encoding: discrete_sinusoidal
+  trajectory_goal_context_layers: 0
+  trajectory_num_phase_tokens: 0
+
+data:
+  type: synthetic
+  num_samples: 8
+  num_points: 64
+  dino_dim: 16
+
+runtime:
+  seed: 7
+  device: cpu
+  allow_cpu_fallback: true
+
+optimization:
+  learning_rate: 0.0001
+  min_learning_rate: 0.000001
+  weight_decay: 0.0001
+  grad_clip_norm: 1.0
+  ema_decay: 0.995
+  amp: false
+
+training:
+  stage: joint
+  batch_size: 2
+  num_workers: 0
+  epochs: 2
+  early_stopping_patience: 2
+
+paths:
+  output_dir: /tmp/lfv_v7_synthetic_smoke
+

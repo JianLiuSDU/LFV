@@ -15,6 +15,11 @@ ARRAY_SHAPES = {
     "trajectory_pose9d": (64, 9),
 }
 
+OPTIONAL_ARRAY_SHAPES = {
+    "manipulated_mask": (256,),
+    "reference_mask": (256,),
+}
+
 
 def validate_functional_motion_sample(sample: Mapping[str, Any]) -> None:
     required = (
@@ -32,6 +37,9 @@ def validate_functional_motion_sample(sample: Mapping[str, Any]) -> None:
         raise KeyError(f"Missing Stage 2 fields: {missing}")
     for key, shape in ARRAY_SHAPES.items():
         if tuple(sample[key].shape) != shape:
+            raise ValueError(f"{key} expected {shape}, got {tuple(sample[key].shape)}")
+    for key, shape in OPTIONAL_ARRAY_SHAPES.items():
+        if key in sample and tuple(sample[key].shape) != shape:
             raise ValueError(f"{key} expected {shape}, got {tuple(sample[key].shape)}")
     for prefix in ("manipulated", "reference"):
         points = sample[f"{prefix}_points"]

@@ -13,7 +13,7 @@ from .registry import build_model
 
 def model_kwargs(config: dict, dino_dim: int) -> dict:
     model = config["model"]
-    return {
+    kwargs = {
         "dino_dim": int(dino_dim),
         "hidden_dim": int(model.get("hidden_dim", 128)),
         "encoder_heads": int(model.get("encoder_heads", 4)),
@@ -113,6 +113,50 @@ def model_kwargs(config: dict, dino_dim: int) -> dict:
             model.get("trajectory_acceleration_weight", 0.0)
         ),
     }
+    if str(model.get("name", "")) == "v7_functional_alignment":
+        # V7-only arguments are added conditionally so old V2/V6 constructors
+        # and checkpoints keep their original signatures.
+        for legacy_key in (
+            "motion_field_temperature",
+            "motion_field_power",
+            "motion_field_pair_weight",
+            "motion_field_fusion_mode",
+            "motion_field_bottleneck",
+            "motion_field_causal_weight",
+            "motion_field_causal_margin",
+            "motion_field_drop_top_weight",
+            "motion_field_consistency_weight",
+            "motion_field_consistency_temperature",
+            "motion_field_consistency_max_points",
+        ):
+            kwargs.pop(legacy_key, None)
+        kwargs.update(
+            {
+                "motion_field_mode": str(
+                    model.get("motion_field_mode", "local_functional_bottleneck")
+                ),
+                "local_dino_proj_dim": int(model.get("local_dino_proj_dim", 64)),
+                "local_object_xyz_dim": int(model.get("local_object_xyz_dim", 32)),
+                "local_relation_xyz_dim": int(model.get("local_relation_xyz_dim", 32)),
+                "field_selector_layers": int(model.get("field_selector_layers", 2)),
+                "field_selector_ffn_dim": int(model.get("field_selector_ffn_dim", 256)),
+                "field_selector_dropout": float(model.get("field_selector_dropout", 0.1)),
+                "field_temperature_start": float(model.get("field_temperature_start", 1.0)),
+                "field_temperature_end": float(model.get("field_temperature_end", 0.4)),
+                "gated_relation_layers": int(model.get("gated_relation_layers", 2)),
+                "gated_relation_ffn_dim": int(model.get("gated_relation_ffn_dim", 256)),
+                "functional_pooling_queries": int(model.get("functional_pooling_queries", 4)),
+                "field_target_ratio_start": float(model.get("field_target_ratio_start", 0.5)),
+                "field_target_ratio_end": float(model.get("field_target_ratio_end", 0.2)),
+                "field_knn": int(model.get("field_knn", 8)),
+                "field_budget_weight": float(model.get("field_budget_weight", 0.02)),
+                "field_smooth_weight": float(model.get("field_smooth_weight", 0.01)),
+                "field_consistency_weight": float(model.get("field_consistency_weight", 0.02)),
+                "field_consistency_temperature": float(model.get("field_consistency_temperature", 0.15)),
+                "field_consistency_max_points": int(model.get("field_consistency_max_points", 64)),
+            }
+        )
+    return kwargs
 
 
 def load_stage2_checkpoint(

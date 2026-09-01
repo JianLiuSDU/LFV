@@ -20,6 +20,12 @@ class ContextEncoding:
     reference_importance: torch.Tensor | None = None
     manipulated_importance: torch.Tensor | None = None
     motion_field_fusion_weight: torch.Tensor | None = None
+    # V7 exposes these as diagnostics while keeping the generator contract
+    # unchanged: only ``tokens`` are passed to Goal/Trajectory decoders.
+    functional_tokens: torch.Tensor | None = None
+    manipulated_field_mask: torch.Tensor | None = None
+    reference_field_mask: torch.Tensor | None = None
+    source_alignment_confidence: torch.Tensor | None = None
 
 
 @dataclass

@@ -59,6 +59,7 @@ def _set_equal_3d(ax, points: np.ndarray) -> None:
 
 def _normalized_entropy(field: np.ndarray) -> float:
     values = np.clip(field.astype(np.float64), 1e-12, None)
+    values = values / max(float(values.sum()), 1e-12)
     return float(-(values * np.log(values)).sum() / np.log(len(values)))
 
 

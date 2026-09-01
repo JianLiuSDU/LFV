@@ -180,6 +180,10 @@ class FunctionalMotionTrainer:
         for epoch in range(self.start_epoch, epochs):
             if hasattr(self.train_dataset, "set_epoch"):
                 self.train_dataset.set_epoch(epoch)
+            if hasattr(self.model, "set_training_progress"):
+                self.model.set_training_progress(
+                    epoch / max(epochs - 1, 1)
+                )
             train_metrics = self._run_loader(self.train_loader, True)
             # Diffusion validation also samples timesteps and Gaussian noise.
             # Evaluate every epoch against the same stochastic probe while

@@ -19,5 +19,9 @@ Older trajectory-diffusion references live in:
 - `diffusion_policy_3d/`
 - `lfv/pipeline/se3_trajectory.py`
 
-Implementation is intentionally left empty until the architecture is finalized.
-
+The package now contains two compatible model variants.  The original
+`ThreeTokenHierarchicalDiffusion` remains available for V2/V6 checkpoints;
+`V7FunctionalAlignmentDiffusion` is selected with the
+`v7_functional_alignment` registry name and uses the source-canonical,
+field-gated encoder in `encoders/v7.py`.  Both variants expose the same
+`compute_loss` and `sample` interfaces.

@@ -116,12 +116,16 @@ def _evaluate_checkpoint(
                 ):
                     if field is None:
                         continue
-                    entropy = -(field * field.clamp_min(1e-12).log()).sum(dim=1)
+                    # V2/V6 expose normalized distributions while V7 exposes
+                    # sigmoid gates.  Report comparable normalized masses.
+                    field_mass = field.clamp_min(0.0)
+                    field_mass = field_mass / field_mass.sum(dim=1, keepdim=True).clamp_min(1e-8)
+                    entropy = -(field_mass * field_mass.clamp_min(1e-12).log()).sum(dim=1)
                     entropy = entropy / torch.log(
                         torch.as_tensor(field.shape[1], device=device, dtype=field.dtype)
                     )
                     values[f"{role}_field_entropy"] = float(entropy.mean().cpu())
-                    values[f"{role}_field_peak"] = float(field.max(dim=1).values.mean().cpu())
+                    values[f"{role}_field_peak"] = float(field_mass.max(dim=1).values.mean().cpu())
                 per_seed.append(values)
             keys = per_seed[0].keys()
             conditions[name].append(

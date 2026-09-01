@@ -49,8 +49,10 @@ class SyntheticFunctionalMotionDataset(Dataset):
         return {
             "manipulated_points": self.manipulated[index],
             "manipulated_dino": self.manipulated_dino[index],
+            "manipulated_mask": torch.ones(self.manipulated.shape[1]),
             "reference_points": self.reference[index],
             "reference_dino": self.reference_dino[index],
+            "reference_mask": torch.ones(self.reference.shape[1]),
             "goal_pose9d": self.goal[index],
             "trajectory_pose9d": self.trajectory[index],
             "scene_origin": torch.zeros(3),

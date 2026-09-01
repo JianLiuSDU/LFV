@@ -61,11 +61,27 @@ class FunctionalMotionDataset(Dataset):
             raw_instance_id = str(data["object_instance_id"])
             object_instance_id = raw_instance_id or str(data["episode_id"])
             consistency_group = raw_instance_id or self.consistency_group_fallback or str(data["episode_id"])
+            num_manipulated = int(data["manipulated_points"].shape[0])
+            num_reference = int(data["reference_points"].shape[0])
             sample: dict[str, Any] = {
                 "manipulated_points": data["manipulated_points"].astype(np.float32),
                 "manipulated_dino": data["manipulated_dino"].astype(np.float32),
                 "reference_points": data["reference_points"].astype(np.float32),
                 "reference_dino": data["reference_dino"].astype(np.float32),
+                # Older immutable caches did not serialize per-point masks.
+                # Their samples were already selected from valid object/depth
+                # masks, so an all-valid mask is the lossless compatibility
+                # representation.  New caches may override these arrays.
+                "manipulated_mask": (
+                    np.asarray(data["manipulated_mask"], dtype=np.float32)
+                    if "manipulated_mask" in data.files
+                    else np.ones(num_manipulated, dtype=np.float32)
+                ),
+                "reference_mask": (
+                    np.asarray(data["reference_mask"], dtype=np.float32)
+                    if "reference_mask" in data.files
+                    else np.ones(num_reference, dtype=np.float32)
+                ),
                 "goal_pose9d": data["goal_pose9d"].astype(np.float32),
                 "trajectory_pose9d": data["trajectory_pose9d"].astype(np.float32),
                 "scene_origin": data["scene_origin"].astype(np.float32),
@@ -82,12 +98,18 @@ class FunctionalMotionDataset(Dataset):
                 permutation = rng.permutation(sample[f"{prefix}_points"].shape[0])
                 sample[f"{prefix}_points"] = sample[f"{prefix}_points"][permutation]
                 sample[f"{prefix}_dino"] = sample[f"{prefix}_dino"][permutation]
+                # Masks are point-aligned payload, not metadata.  Keeping the
+                # old order here would silently gate a different point after
+                # permutation and invalidate the V7 field bottleneck.
+                sample[f"{prefix}_mask"] = sample[f"{prefix}_mask"][permutation]
         validate_functional_motion_sample(sample)
         for key in (
             "manipulated_points",
             "manipulated_dino",
             "reference_points",
             "reference_dino",
+            "manipulated_mask",
+            "reference_mask",
             "goal_pose9d",
             "trajectory_pose9d",
             "scene_origin",
