@@ -21,6 +21,7 @@ def model_kwargs(config: dict, dino_dim: int) -> dict:
         "motion_field_temperature": float(
             model.get("motion_field_temperature", 1.0)
         ),
+        "motion_field_power": float(model.get("motion_field_power", 1.0)),
         "motion_field_pair_weight": float(
             model.get("motion_field_pair_weight", 0.25)
         ),

@@ -47,6 +47,21 @@ def _intervene_distribution(
     raise ValueError("motion_field_intervention must be None, 'uniform', or 'roll'")
 
 
+def _sharpen_distribution(
+    distribution: torch.Tensor,
+    power: float,
+) -> torch.Tensor:
+    """Sharpen a learned field without introducing coordinates or masks."""
+
+    if power <= 0:
+        raise ValueError("motion_field_power must be positive")
+    if abs(float(power) - 1.0) < 1e-8:
+        return distribution
+    axes = tuple(range(1, distribution.ndim))
+    sharpened = distribution.clamp_min(1e-12).pow(float(power))
+    return sharpened / sharpened.sum(dim=axes, keepdim=True).clamp_min(1e-8)
+
+
 def _mix_field(
     current: torch.Tensor,
     prior: torch.Tensor,
@@ -109,6 +124,7 @@ class DirectionalRelation(nn.Module):
         *,
         motion_field_mode: str = "none",
         motion_field_temperature: float = 1.0,
+        motion_field_power: float = 1.0,
     ) -> None:
         super().__init__()
         if motion_field_mode not in {"none", "independent", "joint"}:
@@ -117,8 +133,11 @@ class DirectionalRelation(nn.Module):
             )
         if motion_field_temperature <= 0:
             raise ValueError("motion_field_temperature must be positive")
+        if motion_field_power <= 0:
+            raise ValueError("motion_field_power must be positive")
         self.motion_field_mode = motion_field_mode
         self.motion_field_temperature = float(motion_field_temperature)
+        self.motion_field_power = float(motion_field_power)
         self.query_norm = nn.LayerNorm(hidden_dim)
         self.memory_norm = nn.LayerNorm(hidden_dim)
         self.attention = nn.MultiheadAttention(
@@ -168,7 +187,10 @@ class DirectionalRelation(nn.Module):
         field = None
         token = relation_points.max(dim=1).values
         if self.motion_field_mode == "independent":
-            field = torch.softmax(logits / self.motion_field_temperature, dim=1)
+            field = _sharpen_distribution(
+                torch.softmax(logits / self.motion_field_temperature, dim=1),
+                self.motion_field_power,
+            )
             token = torch.sum(field.unsqueeze(-1) * relation_points, dim=1)
         return DirectionalRelationEncoding(
             token=token,
@@ -190,6 +212,7 @@ class BidirectionalSceneEncoder(nn.Module):
         dropout: float = 0.1,
         motion_field_mode: str = "none",
         motion_field_temperature: float = 1.0,
+        motion_field_power: float = 1.0,
         motion_field_pair_weight: float = 0.25,
         motion_field_fusion_mode: str = "fixed",
         motion_field_bottleneck: bool = False,
@@ -201,6 +224,9 @@ class BidirectionalSceneEncoder(nn.Module):
             raise ValueError("motion_field_pair_weight must be non-negative")
         self.motion_field_mode = motion_field_mode
         self.motion_field_temperature = float(motion_field_temperature)
+        if motion_field_power <= 0:
+            raise ValueError("motion_field_power must be positive")
+        self.motion_field_power = float(motion_field_power)
         self.motion_field_pair_weight = float(motion_field_pair_weight)
         if motion_field_fusion_mode not in {"fixed", "confidence"}:
             raise ValueError("motion_field_fusion_mode must be 'fixed' or 'confidence'")
@@ -232,6 +258,7 @@ class BidirectionalSceneEncoder(nn.Module):
             dropout,
             motion_field_mode=motion_field_mode,
             motion_field_temperature=motion_field_temperature,
+            motion_field_power=motion_field_power,
         )
         self.reference_queries_manipulated = DirectionalRelation(
             hidden_dim,
@@ -239,6 +266,7 @@ class BidirectionalSceneEncoder(nn.Module):
             dropout,
             motion_field_mode=motion_field_mode,
             motion_field_temperature=motion_field_temperature,
+            motion_field_power=motion_field_power,
         )
         self.type_embedding = nn.Parameter(torch.randn(3, hidden_dim) * 0.02)
 
@@ -295,6 +323,9 @@ class BidirectionalSceneEncoder(nn.Module):
                 joint_logits.flatten(1) / self.motion_field_temperature,
                 dim=1,
             ).reshape_as(joint_logits)
+            joint_relation = _sharpen_distribution(
+                joint_relation, self.motion_field_power
+            )
             joint_relation = _intervene_distribution(
                 joint_relation, motion_field_intervention
             )

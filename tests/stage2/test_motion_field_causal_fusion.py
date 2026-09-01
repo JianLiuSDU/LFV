@@ -5,6 +5,7 @@ from lfv.models.functional_motion_generation import ThreeTokenHierarchicalDiffus
 from lfv.models.functional_motion_generation.encoders.bidirectional_scene_encoder import (
     _intervene_distribution,
     _mix_field,
+    _sharpen_distribution,
 )
 
 
@@ -66,3 +67,12 @@ def test_drop_top_counterfactual_removes_mass_and_preserves_normalization():
     counterfactual = _intervene_distribution(distribution, "drop_top")
     assert torch.allclose(counterfactual.sum(dim=1), torch.ones(1))
     assert counterfactual[0, 0] == 0
+
+
+def test_field_power_is_differentiable_and_selective():
+    distribution = torch.tensor([[0.6, 0.2, 0.1, 0.1]], requires_grad=True)
+    sharpened = _sharpen_distribution(distribution, 2.0)
+    assert torch.allclose(sharpened.sum(dim=1), torch.ones(1))
+    assert float(sharpened[0, 0]) > float(distribution[0, 0])
+    sharpened.sum().backward()
+    assert distribution.grad is not None
