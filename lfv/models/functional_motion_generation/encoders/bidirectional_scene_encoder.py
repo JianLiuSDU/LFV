@@ -28,13 +28,29 @@ def _intervene_distribution(
                 dims=dimension,
             )
         return output
-    if intervention == "drop_top":
-        # Remove the highest-mass entries and renormalize.  This is used only
-        # as a no-gradient counterfactual probe: if the learned field is
-        # task-relevant, suppressing its peak should increase the denoising
-        # loss relative to the learned distribution.
+    if intervention == "complement":
+        # A spatially anti-correlated counterfactual.  The small epsilon keeps
+        # the operation well-defined for a one-point distribution and the
+        # explicit renormalization preserves the field contract.
         flat = distribution.flatten(1)
-        num_drop = max(1, int(round(0.1 * flat.shape[1])))
+        output = (flat.max(dim=1, keepdim=True).values - flat).clamp_min(0.0)
+        return (output / output.sum(dim=1, keepdim=True).clamp_min(1e-8)).reshape_as(
+            distribution
+        )
+    if intervention == "drop_top" or intervention.startswith("drop_top_"):
+        # Remove the highest-mass entries and renormalize.  A suffix changes
+        # the removed fraction, e.g. ``drop_top_20`` removes 20 percent.  The
+        # intervention is intentionally deterministic and is used for paired
+        # insertion/deletion curves.
+        flat = distribution.flatten(1)
+        fraction = 0.10
+        if intervention != "drop_top":
+            try:
+                fraction = float(intervention.rsplit("_", 1)[-1]) / 100.0
+            except ValueError as exc:
+                raise ValueError(f"Invalid field intervention: {intervention}") from exc
+        fraction = min(max(fraction, 1.0 / flat.shape[1]), 1.0)
+        num_drop = max(1, int(round(fraction * flat.shape[1])))
         top_indices = torch.topk(flat, k=num_drop, dim=1).indices
         output = flat.scatter(
             1,
@@ -44,7 +60,29 @@ def _intervene_distribution(
         return (output / output.sum(dim=1, keepdim=True).clamp_min(1e-8)).reshape_as(
             distribution
         )
-    raise ValueError("motion_field_intervention must be None, 'uniform', or 'roll'")
+    if intervention.startswith("keep_top_"):
+        # Insertion-curve counterpart: retain only the highest-mass entries
+        # and renormalize.  ``keep_top_10`` retains the top ten percent.
+        flat = distribution.flatten(1)
+        try:
+            fraction = float(intervention.rsplit("_", 1)[-1]) / 100.0
+        except ValueError as exc:
+            raise ValueError(f"Invalid field intervention: {intervention}") from exc
+        fraction = min(max(fraction, 1.0 / flat.shape[1]), 1.0)
+        num_keep = max(1, int(round(fraction * flat.shape[1])))
+        top_indices = torch.topk(flat, k=num_keep, dim=1).indices
+        output = torch.zeros_like(flat).scatter(
+            1,
+            top_indices,
+            flat.gather(1, top_indices),
+        )
+        return (output / output.sum(dim=1, keepdim=True).clamp_min(1e-8)).reshape_as(
+            distribution
+        )
+    raise ValueError(
+        "motion_field_intervention must be None, 'uniform', 'roll', "
+        "'complement', 'drop_top[_PERCENT]', or 'keep_top_PERCENT'"
+    )
 
 
 def _sharpen_distribution(

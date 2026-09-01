@@ -69,6 +69,15 @@ def test_drop_top_counterfactual_removes_mass_and_preserves_normalization():
     assert counterfactual[0, 0] == 0
 
 
+def test_field_insertion_and_complement_counterfactuals_are_normalized():
+    distribution = torch.tensor([[0.6, 0.2, 0.1, 0.1]])
+    for intervention in ("complement", "keep_top_25", "drop_top_25"):
+        counterfactual = _intervene_distribution(distribution, intervention)
+        assert torch.allclose(counterfactual.sum(dim=1), torch.ones(1))
+        assert torch.isfinite(counterfactual).all()
+    assert _intervene_distribution(distribution, "keep_top_25")[0, 0] > 0.99
+
+
 def test_field_power_is_differentiable_and_selective():
     distribution = torch.tensor([[0.6, 0.2, 0.1, 0.1]], requires_grad=True)
     sharpened = _sharpen_distribution(distribution, 2.0)
