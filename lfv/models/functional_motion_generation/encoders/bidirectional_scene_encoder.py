@@ -58,8 +58,13 @@ def _sharpen_distribution(
     if abs(float(power) - 1.0) < 1e-8:
         return distribution
     axes = tuple(range(1, distribution.ndim))
-    sharpened = distribution.clamp_min(1e-12).pow(float(power))
-    return sharpened / sharpened.sum(dim=axes, keepdim=True).clamp_min(1e-8)
+    # Work in log space.  Joint pair fields can contain 1/(N*M) masses; a
+    # direct fourth power would underflow to zero before normalization.
+    log_values = distribution.clamp_min(1e-12).log() * float(power)
+    normalizer = torch.logsumexp(log_values.flatten(1), dim=1).reshape(
+        (distribution.shape[0],) + (1,) * (distribution.ndim - 1)
+    )
+    return (log_values - normalizer).exp()
 
 
 def _mix_field(
