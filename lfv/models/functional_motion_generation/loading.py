@@ -24,6 +24,27 @@ def model_kwargs(config: dict, dino_dim: int) -> dict:
         "motion_field_pair_weight": float(
             model.get("motion_field_pair_weight", 0.25)
         ),
+        "motion_field_fusion_mode": str(
+            model.get("motion_field_fusion_mode", "fixed")
+        ),
+        "motion_field_bottleneck": bool(
+            model.get("motion_field_bottleneck", False)
+        ),
+        "motion_field_causal_weight": float(
+            model.get("motion_field_causal_weight", 0.0)
+        ),
+        "motion_field_causal_margin": float(
+            model.get("motion_field_causal_margin", 0.0)
+        ),
+        "motion_field_consistency_weight": float(
+            model.get("motion_field_consistency_weight", 0.0)
+        ),
+        "motion_field_consistency_temperature": float(
+            model.get("motion_field_consistency_temperature", 0.1)
+        ),
+        "motion_field_consistency_max_points": int(
+            model.get("motion_field_consistency_max_points", 64)
+        ),
         "goal_layers": int(model.get("goal_layers", 4)),
         "trajectory_layers": int(model.get("trajectory_layers", 6)),
         "decoder_heads": int(model.get("decoder_heads", 4)),

@@ -54,6 +54,7 @@ def main() -> int:
             shuffle_points=bool(data.get("shuffle_points", True)),
             seed=int(config["runtime"]["seed"]),
             limit=data.get("train_limit"),
+            consistency_group_fallback=data.get("consistency_group_fallback"),
         )
         if bool(data.get("overfit_same_as_train", False)):
             val_dataset = train_dataset
@@ -64,6 +65,7 @@ def main() -> int:
                 shuffle_points=False,
                 seed=int(config["runtime"]["seed"]),
                 limit=data.get("val_limit"),
+                consistency_group_fallback=data.get("consistency_group_fallback"),
             )
         config["data"]["dino_dim"] = train_dataset.dino_dim
         collate_fn = collate_functional_motion

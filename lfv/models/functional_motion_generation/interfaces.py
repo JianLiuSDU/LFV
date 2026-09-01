@@ -19,6 +19,7 @@ class ContextEncoding:
     attention_reference_to_manipulated: torch.Tensor | None = None
     reference_importance: torch.Tensor | None = None
     manipulated_importance: torch.Tensor | None = None
+    motion_field_fusion_weight: torch.Tensor | None = None
 
 
 @dataclass

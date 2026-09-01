@@ -22,12 +22,18 @@ class FunctionalMotionDataset(Dataset):
         shuffle_points: bool = True,
         seed: int = 42,
         limit: int | None = None,
+        consistency_group_fallback: str | None = None,
     ) -> None:
         self.root = Path(cache_root)
         self.split = split
         self.shuffle_points = bool(shuffle_points)
         self.seed = int(seed)
         self.epoch = 0
+        self.consistency_group_fallback = (
+            str(consistency_group_fallback).strip()
+            if consistency_group_fallback is not None
+            else ""
+        )
         manifest = json.loads((self.root / "manifest.json").read_text(encoding="utf-8"))
         split_manifest = json.loads(
             (self.root / "split_manifest.json").read_text(encoding="utf-8")
@@ -52,6 +58,9 @@ class FunctionalMotionDataset(Dataset):
     def __getitem__(self, index: int) -> dict[str, Any]:
         record = self.records[index]
         with np.load(record["artifact"], allow_pickle=False) as data:
+            raw_instance_id = str(data["object_instance_id"])
+            object_instance_id = raw_instance_id or str(data["episode_id"])
+            consistency_group = raw_instance_id or self.consistency_group_fallback or str(data["episode_id"])
             sample: dict[str, Any] = {
                 "manipulated_points": data["manipulated_points"].astype(np.float32),
                 "manipulated_dino": data["manipulated_dino"].astype(np.float32),
@@ -62,7 +71,8 @@ class FunctionalMotionDataset(Dataset):
                 "scene_origin": data["scene_origin"].astype(np.float32),
                 "scene_scale": np.asarray(data["scene_scale"], dtype=np.float32),
                 "episode_id": str(data["episode_id"]),
-                "object_instance_id": str(data["object_instance_id"]) or str(data["episode_id"]),
+                "object_instance_id": object_instance_id,
+                "field_consistency_group": consistency_group,
             }
         if self.shuffle_points:
             rng = np.random.default_rng(
