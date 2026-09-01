@@ -108,6 +108,7 @@ def main() -> int:
         ("learned", None),
         ("uniform", "uniform"),
         ("rolled", "roll"),
+        ("drop_top", "drop_top"),
     ):
         results[name] = _evaluate(
             model,

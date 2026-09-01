@@ -2,7 +2,10 @@ import torch
 
 from lfv.datasets.functional_motion import SyntheticFunctionalMotionDataset
 from lfv.models.functional_motion_generation import ThreeTokenHierarchicalDiffusion
-from lfv.models.functional_motion_generation.encoders.bidirectional_scene_encoder import _mix_field
+from lfv.models.functional_motion_generation.encoders.bidirectional_scene_encoder import (
+    _intervene_distribution,
+    _mix_field,
+)
 
 
 def _batch(count=2):
@@ -56,3 +59,10 @@ def test_causal_probe_and_same_instance_consistency_are_finite():
     assert torch.isfinite(losses["motion_field_causal"])
     assert torch.isfinite(losses["motion_field_consistency"])
     assert torch.isfinite(losses["total"])
+
+
+def test_drop_top_counterfactual_removes_mass_and_preserves_normalization():
+    distribution = torch.tensor([[0.6, 0.2, 0.1, 0.1]])
+    counterfactual = _intervene_distribution(distribution, "drop_top")
+    assert torch.allclose(counterfactual.sum(dim=1), torch.ones(1))
+    assert counterfactual[0, 0] == 0

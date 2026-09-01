@@ -324,12 +324,14 @@ class ThreeTokenHierarchicalDiffusion(nn.Module):
             if drop_top_losses is not None:
                 # A useful field must be more than a visualization: suppressing
                 # its highest-mass entries should hurt the task objective.  The
-                # counterfactual target is detached so the model cannot satisfy
-                # the constraint by intentionally worsening the intervention.
+                # branch stays differentiable so the model is explicitly pushed
+                # to make the peak-removal counterfactual harder.  In contrast,
+                # the uniform probe above is detached to avoid a trivial
+                # solution that merely worsens the intervention.
                 drop_effect = F.relu(
                     self.motion_field_causal_margin
                     + losses["total"]
-                    - drop_top_losses["total"].detach()
+                    - drop_top_losses["total"]
                 )
                 losses["motion_field_drop_top_total"] = drop_top_losses[
                     "total"
