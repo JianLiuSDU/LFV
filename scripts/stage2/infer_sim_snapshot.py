@@ -465,8 +465,19 @@ def main() -> int:
     )
     goal_overlay_path = output / "goal_pose_candidates_overlay.png"
     cv2.imwrite(str(goal_overlay_path), goal_overlay)
-    manipulated_importance = encoding.manipulated_importance[0].cpu().numpy()
-    reference_importance = encoding.reference_importance[0].cpu().numpy()
+    # V2/V6 expose directional relevance as ``*_importance``.  V7 makes the
+    # scalar Motion Functional Field the only generator-facing relation, so
+    # use that field for the same diagnostic overlay.
+    manipulated_relation = encoding.manipulated_importance
+    if manipulated_relation is None:
+        manipulated_relation = encoding.manipulated_motion_field
+    reference_relation = encoding.reference_importance
+    if reference_relation is None:
+        reference_relation = encoding.reference_motion_field
+    if manipulated_relation is None or reference_relation is None:
+        raise RuntimeError("Checkpoint does not expose relation fields for visualization")
+    manipulated_importance = manipulated_relation[0].cpu().numpy()
+    reference_importance = reference_relation[0].cpu().numpy()
     manipulated_attention = _heat_overlay(
         rgb, manipulated_pixels, manipulated_importance, (0, 200, 255),
         f"reference queries -> important {args.manipulated_label} points",
