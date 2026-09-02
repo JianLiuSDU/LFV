@@ -224,7 +224,9 @@ class FieldSelector(nn.Module):
         reference: torch.Tensor,
         manipulated_mask: torch.Tensor,
         reference_mask: torch.Tensor,
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        *,
+        return_features: bool = False,
+    ) -> tuple[torch.Tensor, ...]:
         selected_m = manipulated
         selected_r = reference
         for block_m, block_r in zip(self.m_to_r, self.r_to_m):
@@ -235,8 +237,11 @@ class FieldSelector(nn.Module):
         logits_r = self.reference_head(selected_r).squeeze(-1) / temperature
         gate_m = torch.sigmoid(logits_m) * manipulated_mask
         gate_r = torch.sigmoid(logits_r) * reference_mask
-        # Only gates/logits leave this module.  Selector hidden states are
-        # intentionally not returned to the generator path.
+        # Only gates/logits leave this module in the generator path.  The
+        # optional detached-style diagnostic return is consumed only by
+        # ``V7SceneEncoding`` and never by Goal/Trajectory decoders.
+        if return_features:
+            return gate_m, gate_r, logits_m, logits_r, selected_m, selected_r
         return gate_m, gate_r, logits_m, logits_r
 
 
@@ -416,6 +421,11 @@ class V7SceneEncoding:
     reference_local: torch.Tensor
     manipulated_relation: torch.Tensor
     reference_relation: torch.Tensor
+    selector_feature_m: torch.Tensor | None = None
+    selector_feature_r: torch.Tensor | None = None
+    functional_tokens_m: torch.Tensor | None = None
+    functional_tokens_r: torch.Tensor | None = None
+    joint_token: torch.Tensor | None = None
 
 
 class V7SceneEncoder(nn.Module):
@@ -532,7 +542,20 @@ class V7SceneEncoder(nn.Module):
         local_r = self.reference_local_encoder(object_r, relation_r, reference_dino)
         local_m = local_m + self.manipulated_role[None, None]
         local_r = local_r + self.reference_role[None, None]
-        selected = self.selector(local_m, local_r, mask_m, mask_r)
+        selected_output = self.selector(
+            local_m,
+            local_r,
+            mask_m,
+            mask_r,
+            return_features=return_debug,
+        )
+        selected = selected_output[:4]
+        selector_feature_m = (
+            selected_output[4] if return_debug else None
+        )
+        selector_feature_r = (
+            selected_output[5] if return_debug else None
+        )
         gate_m, gate_r, logits_m, logits_r = self._override_or_select(
             selected, field_override, (mask_m, mask_r)
         )
@@ -561,4 +584,9 @@ class V7SceneEncoder(nn.Module):
             reference_local=local_r,
             manipulated_relation=gated_m,
             reference_relation=gated_r,
+            selector_feature_m=selector_feature_m,
+            selector_feature_r=selector_feature_r,
+            functional_tokens_m=pooled_m,
+            functional_tokens_r=pooled_r,
+            joint_token=global_token,
         )
